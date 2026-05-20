@@ -3,7 +3,11 @@
     "allow": [
       "Bash(git -C /home/spoulson/src/frostd log --oneline)",
       "Bash(git *)",
-      "Bash(go version *)"
+      "Bash(go version *)",
+      "Bash(go get *)",
+      "Bash(chmod +x *)",
+      "Bash(go build *)",
+      "Bash(go test *)"
     ]
   }
 }
