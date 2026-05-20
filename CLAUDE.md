@@ -85,11 +85,13 @@ Log file output file is specified (Default `/var/log/frostd/frostd.log`).
 
 ## Technology Stack
 
-`frostd` is written in Golang and compiled to standalone executable file to be run on Debian or Ubuntu Linux on x86-64 architecture.  The executable runs as a systemd service.
+`frostd` is written in Golang and compiled to standalone executable file to be
+run on Debian or Ubuntu Linux on x86-64 architecture.  The executable runs as a
+systemd service.
 
 ## Developer Prerequisites
 
-- Debian or Ubuntu Linux OS
+- Debian or Ubuntu Linux OS on x86-64 architecture
 - Golang 1.26+ installed
 - `make` installed
 
@@ -97,13 +99,14 @@ Log file output file is specified (Default `/var/log/frostd/frostd.log`).
 
 ### Technology Stack
 
-`frostd` is a service written in latest Golang and follows Golang's current
-standards of code style and best practices as outlined in Effective Go by
-Google.
+- `frostd` is a systemd service written in latest Golang.
+- It must be run on a Dell PowerEdge 12th generation server.
 
-Use `slog` package for logging.
+### Tooling
 
-Use module `github.com/bougou/go-ipmi` for IPMI support.
+- Use `slog` package for logging.
+- Use module `github.com/bougou/go-ipmi` for IPMI support.  Do not depend on
+the commonly used `ipmitool` command.
 
 ### Service Lifecycle
 
@@ -117,12 +120,16 @@ Then, the service runs in a loop.  On each iteration:
   - Sleep to incremental times, not static durations.  This ensures loops occur
   on steady cadence even if one iteration takes a bit longer to process.
 
-The service immediately and gracefully stops when requested with command: `systemctl stop frostd`.
+The service immediately and gracefully stops when requested with command:
+`systemctl stop frostd`.
 
 ### Tests
 
 Tests are required to confirm requirements and prevent regressions during code
 maintenance.
+
+Use module `github.com/stretchr/testify` for `assert` and `require` packages
+for simplifying assertions and validation logic.
 
 End-to-end tests are required for functionality:
 - Configuration parsing
@@ -174,6 +181,20 @@ The package installation script steps:
 - Copy default config file to `/etc/frostd.yaml`
 - Add systemd configuration for `frostd` service
 - Start `frostd` service
+
+## Code Style
+
+### Makefile
+
+Use `.PHONY` directives to indicate a target is a descriptive script name and
+not a literal filename.  Place the directive on the line before its definition,
+not as a single directive for all targets.  This helps prevent forgetting to
+update the list.
+
+### Golang
+
+Write code for latest Golang version. Follow Golang's current standards of code
+style and best practices as outlined in Effective Go by Google.
 
 ## License
 

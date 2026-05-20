@@ -28,21 +28,20 @@ func main() {
 	}
 	defer closer()
 
-	runner := RealRunner{}
-	fanCtrl := &IPMIFanController{runner: runner}
+	fanCtrl := &IPMIFanController{newClient: newRealIPMIClient}
 
 	var monitors []*DeviceMonitor
 	var interval time.Duration
 
 	if cfg.CPU != nil {
-		m := newDeviceMonitor("cpu", cfg.CPU, &CPUReader{runner: runner})
+		m := newDeviceMonitor("cpu", cfg.CPU, &CPUReader{newClient: newRealIPMIClient})
 		monitors = append(monitors, m)
 		if interval == 0 || cfg.CPU.SampleInterval < interval {
 			interval = cfg.CPU.SampleInterval
 		}
 	}
 	if cfg.GPU != nil {
-		m := newDeviceMonitor("gpu", cfg.GPU, &GPUReader{runner: runner})
+		m := newDeviceMonitor("gpu", cfg.GPU, &GPUReader{runner: RealRunner{}})
 		monitors = append(monitors, m)
 		if interval == 0 || cfg.GPU.SampleInterval < interval {
 			interval = cfg.GPU.SampleInterval

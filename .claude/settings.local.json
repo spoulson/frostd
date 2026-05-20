@@ -7,7 +7,8 @@
       "Bash(go get *)",
       "Bash(chmod +x *)",
       "Bash(go build *)",
-      "Bash(go test *)"
+      "Bash(go test *)",
+      "Bash(go mod *)"
     ]
   }
 }

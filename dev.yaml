@@ -5,3 +5,9 @@ cpu:
   max_temp: 75
   sample_size: 3
   sample_interval: 15s
+
+gpu:
+  ideal_temp: 40
+  max_temp: 75
+  sample_size: 3
+  sample_interval: 15s

@@ -1,69 +1,76 @@
 package main
 
 import (
-	"errors"
 	"testing"
+
+	ipmi "github.com/bougou/go-ipmi"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-const sampleIPMIOutput = `Inlet Temp       | 04h | ok  | 7.1 | 23 degrees C
-Exhaust Temp     | 01h | ok  | 7.1 | 29 degrees C
-Temp             | 0Eh | ok  | 3.1 | 45 degrees C
-Temp             | 0Fh | ok  | 3.2 | 50 degrees C
-`
+func makeProcessorTempSensor(value float64, entityInstance uint8) *ipmi.Sensor {
+	return &ipmi.Sensor{
+		SensorType:     ipmi.SensorTypeTemperature,
+		EntityID:       ipmi.EntityID(0x03),
+		EntityInstance: ipmi.EntityInstance(entityInstance),
+		Value:          value,
+	}
+}
 
-func TestCPUReader_ParsesProcessorTemps(t *testing.T) {
-	temps, err := parseCPUTemps(sampleIPMIOutput)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+func makeInletTempSensor(value float64) *ipmi.Sensor {
+	return &ipmi.Sensor{
+		SensorType: ipmi.SensorTypeTemperature,
+		EntityID:   ipmi.EntityID(0x07), // system board
+		Value:      value,
 	}
-	if len(temps) != 2 {
-		t.Fatalf("got %d temps, want 2", len(temps))
+}
+
+func TestCPUReader_ReturnsProcessorTemps(t *testing.T) {
+	mock := &mockIPMIClient{
+		sensors: []*ipmi.Sensor{
+			makeProcessorTempSensor(45, 1),
+			makeProcessorTempSensor(50, 2),
+			makeInletTempSensor(23),
+		},
 	}
-	if temps[0] != 45 {
-		t.Errorf("temps[0] = %.1f, want 45", temps[0])
-	}
-	if temps[1] != 50 {
-		t.Errorf("temps[1] = %.1f, want 50", temps[1])
-	}
+	reader := &CPUReader{newClient: mockIPMIFactory(mock)}
+	temps, err := reader.ReadTemperatures()
+	require.NoError(t, err)
+	assert.Equal(t, []float64{45, 50}, temps)
 }
 
 func TestCPUReader_IgnoresNonProcessorSensors(t *testing.T) {
-	output := `Inlet Temp       | 04h | ok  | 7.1 | 23 degrees C
-Exhaust Temp     | 01h | ok  | 7.1 | 29 degrees C
-`
-	_, err := parseCPUTemps(output)
-	if err == nil {
-		t.Fatal("expected error when no processor sensors found")
+	mock := &mockIPMIClient{
+		sensors: []*ipmi.Sensor{
+			makeInletTempSensor(23),
+		},
 	}
-}
-
-func TestCPUReader_EmptyOutput(t *testing.T) {
-	_, err := parseCPUTemps("")
-	if err == nil {
-		t.Fatal("expected error for empty output")
-	}
-}
-
-func TestCPUReader_ReadTemperatures_UsesIpmitool(t *testing.T) {
-	r := &mockRunner{output: []byte(sampleIPMIOutput)}
-	reader := &CPUReader{runner: r}
-	temps, err := reader.ReadTemperatures()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(temps) != 2 {
-		t.Errorf("got %d temps, want 2", len(temps))
-	}
-	if len(r.calls) != 1 || r.calls[0][1] != "sdr" {
-		t.Errorf("unexpected ipmitool call: %v", r.calls)
-	}
-}
-
-func TestCPUReader_ReadTemperatures_CommandError(t *testing.T) {
-	r := &mockRunner{err: errors.New("ipmitool not found")}
-	reader := &CPUReader{runner: r}
+	reader := &CPUReader{newClient: mockIPMIFactory(mock)}
 	_, err := reader.ReadTemperatures()
-	if err == nil {
-		t.Fatal("expected error when ipmitool fails")
-	}
+	assert.ErrorContains(t, err, "no CPU temperature sensors found")
 }
+
+func TestCPUReader_EmptySensorList(t *testing.T) {
+	mock := &mockIPMIClient{sensors: []*ipmi.Sensor{}}
+	reader := &CPUReader{newClient: mockIPMIFactory(mock)}
+	_, err := reader.ReadTemperatures()
+	assert.Error(t, err)
+}
+
+func TestCPUReader_ClientConnectError(t *testing.T) {
+	reader := &CPUReader{newClient: mockIPMIFactoryErr("no IPMI device")}
+	_, err := reader.ReadTemperatures()
+	assert.Error(t, err)
+}
+
+func TestCPUReader_GetSensorsError(t *testing.T) {
+	mock := &mockIPMIClient{rawErr: errIPMI("ipmitool failed")}
+	reader := &CPUReader{newClient: mockIPMIFactory(mock)}
+	_, err := reader.ReadTemperatures()
+	assert.Error(t, err)
+}
+
+// errIPMI is a simple error helper for tests.
+type errIPMI string
+
+func (e errIPMI) Error() string { return string(e) }
