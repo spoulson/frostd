@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /home/spoulson/src/frostd log --oneline)",
+      "Bash(git *)",
+      "Bash(go version *)"
+    ]
+  }
+}
