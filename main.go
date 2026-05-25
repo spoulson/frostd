@@ -67,16 +67,16 @@ func main() {
 			logger.Info("temperature", "device", m.name, "aggregate_celsius", fmt.Sprintf("%.1f", agg))
 
 			speed := SuggestSpeed(agg, m.cfg.IdealTemp, m.cfg.MaxTemp)
-			logger.Info("suggested fan speed", "device", m.name, "percent", speed)
 			if speed > maxSpeed {
 				maxSpeed = speed
 			}
+			logger.Info("suggested fan speed", "device", m.name, "required_percent", speed)
 		}
 
 		if cfg.DryRun {
-			logger.Info("dry run: skipping fan speed change", "percent", maxSpeed)
+			logger.Info("dry run: skipping fan speed change", "system_percent", maxSpeed)
 		} else {
-			logger.Info("setting fan speed", "percent", maxSpeed)
+			logger.Info("setting fan speed", "system_percent", maxSpeed)
 			if err := fanCtrl.SetSpeed(maxSpeed); err != nil {
 				logger.Error("failed to set fan speed", "error", err)
 			}
