@@ -10,6 +10,7 @@ import (
 
 type Config struct {
 	LogFile string        `yaml:"log_file"`
+	DryRun  bool          `yaml:"dry_run"`
 	CPU     *DeviceConfig `yaml:"cpu"`
 	GPU     *DeviceConfig `yaml:"gpu"`
 }

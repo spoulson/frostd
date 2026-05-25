@@ -1,4 +1,5 @@
 log_file: /var/log/frostd/frostd.log
+dry_run: false
 
 cpu:
   ideal_temp: 40

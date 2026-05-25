@@ -1,4 +1,5 @@
 log_file: ""
+dry_run: false
 
 cpu:
   ideal_temp: 40

@@ -36,11 +36,31 @@ gpu:
 	cfg, err := loadConfig(path)
 	require.NoError(t, err)
 	assert.Equal(t, "/var/log/frostd/frostd.log", cfg.LogFile)
+	assert.False(t, cfg.DryRun)
 	assert.Equal(t, 45.0, cfg.CPU.IdealTemp)
 	assert.Equal(t, 80.0, cfg.CPU.MaxTemp)
 	assert.Equal(t, 5, cfg.CPU.SampleSize)
 	assert.Equal(t, 10*time.Second, cfg.CPU.SampleInterval)
 	assert.Equal(t, 50.0, cfg.GPU.IdealTemp)
+}
+
+func TestLoadConfig_DryRunEnabled(t *testing.T) {
+	path := writeTempConfig(t, `
+dry_run: true
+cpu:
+  ideal_temp: 40
+  max_temp: 75
+`)
+	cfg, err := loadConfig(path)
+	require.NoError(t, err)
+	assert.True(t, cfg.DryRun)
+}
+
+func TestLoadConfig_DryRunDefault(t *testing.T) {
+	path := writeTempConfig(t, `cpu: {}`)
+	cfg, err := loadConfig(path)
+	require.NoError(t, err)
+	assert.False(t, cfg.DryRun)
 }
 
 func TestLoadConfig_Defaults(t *testing.T) {

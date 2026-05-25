@@ -51,7 +51,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
-	logger.Info("frostd started", "config", *configPath, "interval", interval)
+	logger.Info("frostd started", "config", *configPath, "interval", interval, "dry_run", cfg.DryRun)
 
 	nextTick := time.Now()
 	for {
@@ -73,9 +73,13 @@ func main() {
 			}
 		}
 
-		logger.Info("setting fan speed", "percent", maxSpeed)
-		if err := fanCtrl.SetSpeed(maxSpeed); err != nil {
-			logger.Error("failed to set fan speed", "error", err)
+		if cfg.DryRun {
+			logger.Info("dry run: skipping fan speed change", "percent", maxSpeed)
+		} else {
+			logger.Info("setting fan speed", "percent", maxSpeed)
+			if err := fanCtrl.SetSpeed(maxSpeed); err != nil {
+				logger.Error("failed to set fan speed", "error", err)
+			}
 		}
 
 		delay := time.Until(nextTick)

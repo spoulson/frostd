@@ -83,6 +83,11 @@ multiple GPUs).
 
 Log file output file is specified (Default `/var/log/frostd/frostd.log`).
 
+Dry run mode is enabled with `dry_run: true` (Default `false`).  When enabled,
+frostd monitors temperature metrics and logs suggested fan speeds but does not
+issue any fan speed changes via IPMI.  Useful for observing behavior without
+affecting hardware.
+
 ## Technology Stack
 
 `frostd` is written in Golang and compiled to standalone executable file to be
