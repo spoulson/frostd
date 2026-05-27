@@ -11,18 +11,27 @@ import (
 	"syscall"
 )
 
+const version = "0.1.0"
+
 type args struct {
-	configPath string
+	configPath  string
+	showVersion bool
 }
 
 func parseArgs() args {
 	configPath := flag.String("c", "/etc/frostd.yaml", "path to config file")
+	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
-	return args{configPath: *configPath}
+	return args{configPath: *configPath, showVersion: *showVersion}
 }
 
 func main() {
 	a := parseArgs()
+
+	if a.showVersion {
+		fmt.Println(version)
+		return
+	}
 
 	cfg, err := loadConfig(a.configPath)
 	if err != nil {
