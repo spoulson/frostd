@@ -37,7 +37,14 @@ func (r *CPUReader) ReadTemperatures() (map[string]float64, error) {
 		if uint8(s.EntityID) != 0x03 {
 			continue
 		}
-		temps[s.Name] = s.Value
+		key := s.Name
+		for i := 2; ; i++ {
+			if _, exists := temps[key]; !exists {
+				break
+			}
+			key = fmt.Sprintf("%s_%d", s.Name, i)
+		}
+		temps[key] = s.Value
 	}
 	if len(temps) == 0 {
 		return nil, fmt.Errorf("no CPU temperature sensors found")

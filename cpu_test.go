@@ -40,6 +40,20 @@ func TestCPUReader_ReturnsProcessorTemps(t *testing.T) {
 	assert.Equal(t, map[string]float64{"CPU1 Temp": 45, "CPU2 Temp": 50}, temps)
 }
 
+func TestCPUReader_DeduplicatesSensorNames(t *testing.T) {
+	mock := &mockIPMIClient{
+		sensors: []*ipmi.Sensor{
+			makeProcessorTempSensor("Temp", 45, 1),
+			makeProcessorTempSensor("Temp", 50, 2),
+			makeProcessorTempSensor("Temp", 55, 3),
+		},
+	}
+	reader := &CPUReader{newClient: mockIPMIFactory(mock)}
+	temps, err := reader.ReadTemperatures()
+	require.NoError(t, err)
+	assert.Equal(t, map[string]float64{"Temp": 45, "Temp_2": 50, "Temp_3": 55}, temps)
+}
+
 func TestCPUReader_IgnoresNonProcessorSensors(t *testing.T) {
 	mock := &mockIPMIClient{
 		sensors: []*ipmi.Sensor{
