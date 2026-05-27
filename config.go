@@ -9,10 +9,11 @@ import (
 )
 
 type Config struct {
-	LogFile string        `yaml:"log_file"`
-	DryRun  bool          `yaml:"dry_run"`
-	CPU     *SensorConfig `yaml:"cpu"`
-	GPU     *SensorConfig `yaml:"gpu"`
+	LogFile        string        `yaml:"log_file"`
+	DryRun         bool          `yaml:"dry_run"`
+	FanLogInterval time.Duration `yaml:"fan_log_interval"`
+	CPU            *SensorConfig `yaml:"cpu"`
+	GPU            *SensorConfig `yaml:"gpu"`
 }
 
 type SensorConfig struct {
@@ -39,6 +40,9 @@ func loadConfig(path string) (*Config, error) {
 }
 
 func applyDefaults(cfg *Config) {
+	if cfg.FanLogInterval == 0 {
+		cfg.FanLogInterval = 15 * time.Second
+	}
 	if cfg.CPU != nil {
 		applySensorDefaults(cfg.CPU)
 	}
@@ -65,6 +69,9 @@ func applySensorDefaults(d *SensorConfig) {
 func validateConfig(cfg *Config) error {
 	if cfg.CPU == nil && cfg.GPU == nil {
 		return fmt.Errorf("config must enable at least one sensor type (cpu or gpu)")
+	}
+	if cfg.FanLogInterval <= 0 {
+		return fmt.Errorf("fan_log_interval must be positive, got %s", cfg.FanLogInterval)
 	}
 	if cfg.CPU != nil {
 		if err := validateSensorConfig("cpu", cfg.CPU); err != nil {

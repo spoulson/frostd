@@ -1,14 +1,15 @@
 log_file: ""
-dry_run: true
+# dry_run: true
 
 cpu:
   ideal_temp: 40
-  max_temp: 75
+  max_temp: 80
   sample_size: 3
   sample_interval: 15s
 
 gpu:
+  # Constant LLM loads maintain ~75-80C and then quickly falls to 60C
   ideal_temp: 40
-  max_temp: 75
+  max_temp: 80
   sample_size: 3
-  sample_interval: 15s
+  sample_interval: 10s

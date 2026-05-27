@@ -11,6 +11,42 @@ import (
 	"time"
 )
 
+type speedUpdate struct {
+	sensor string
+	speed  int
+}
+
+func runSensor(ctx context.Context, m *SensorMonitor, logger *slog.Logger, ch chan<- speedUpdate) {
+	nextTick := time.Now()
+	for {
+		nextTick = nextTick.Add(m.cfg.SampleInterval)
+
+		agg, err := m.Poll()
+		if err != nil {
+			logger.Error("sensor temperature poll failed", "sensor", m.name, "error", err)
+		} else {
+			logger.Info("sensor temperature", "sensor", m.name, "aggregate_temp", fmt.Sprintf("%.1f", agg))
+			speed := SuggestSpeed(agg, m.cfg.IdealTemp, m.cfg.MaxTemp)
+			logger.Info("sensor suggested fan speed", "sensor", m.name, "suggest_percent", speed)
+			select {
+			case ch <- speedUpdate{sensor: m.name, speed: speed}:
+			case <-ctx.Done():
+				return
+			}
+		}
+
+		delay := time.Until(nextTick)
+		if delay < 0 {
+			delay = 0
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(delay):
+		}
+	}
+}
+
 func main() {
 	configPath := flag.String("c", "/etc/frostd.yaml", "path to config file")
 	flag.Parse()
@@ -31,48 +67,28 @@ func main() {
 	fanCtrl := &IPMIFanController{newClient: newRealIPMIClient}
 
 	var monitors []*SensorMonitor
-	var interval time.Duration
 
 	if cfg.CPU != nil {
-		m := newSensorMonitor("cpu", cfg.CPU, &CPUReader{newClient: newRealIPMIClient})
-		monitors = append(monitors, m)
-		if interval == 0 || cfg.CPU.SampleInterval < interval {
-			interval = cfg.CPU.SampleInterval
-		}
+		monitors = append(monitors, newSensorMonitor("cpu", cfg.CPU, &CPUReader{newClient: newRealIPMIClient}))
 	}
 	if cfg.GPU != nil {
-		m := newSensorMonitor("gpu", cfg.GPU, &GPUReader{runner: RealRunner{}})
-		monitors = append(monitors, m)
-		if interval == 0 || cfg.GPU.SampleInterval < interval {
-			interval = cfg.GPU.SampleInterval
-		}
+		monitors = append(monitors, newSensorMonitor("gpu", cfg.GPU, &GPUReader{runner: RealRunner{}}))
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
-	logger.Info("frostd started", "config", *configPath, "interval", interval, "dry_run", cfg.DryRun)
+	logger.Info("frostd started", "config", *configPath, "dry_run", cfg.DryRun)
 
-	nextTick := time.Now()
-	for {
-		nextTick = nextTick.Add(interval)
+	ch := make(chan speedUpdate, len(monitors))
+	latestSpeeds := make(map[string]int, len(monitors))
+	for _, m := range monitors {
+		latestSpeeds[m.name] = 0
+		go runSensor(ctx, m, logger, ch)
+	}
 
-		maxSpeed := 0
-		for _, m := range monitors {
-			agg, err := m.Poll()
-			if err != nil {
-				logger.Error("temperature poll failed", "sensor", m.name, "error", err)
-				continue
-			}
-			logger.Info("temperature", "sensor", m.name, "aggregate_temp", fmt.Sprintf("%.1f", agg))
-
-			speed := SuggestSpeed(agg, m.cfg.IdealTemp, m.cfg.MaxTemp)
-			if speed > maxSpeed {
-				maxSpeed = speed
-			}
-			logger.Info("suggested fan speed", "sensor", m.name, "required_percent", speed)
-		}
-
+	prevFanReadings := map[string]FanReading{}
+	logFanSpeeds := func() {
 		if readings, err := fanCtrl.ReadFanSpeeds(); err != nil {
 			logger.Error("failed to read current fan speeds", "error", err)
 		} else {
@@ -80,32 +96,52 @@ func main() {
 				args := []any{"fan", r.Name}
 				if r.RPM != nil {
 					args = append(args, "rpm", int(*r.RPM))
+					if prev, ok := prevFanReadings[r.Name]; ok && prev.RPM != nil {
+						args = append(args, "delta", int(*r.RPM-*prev.RPM))
+					}
 				}
 				if r.Percent != nil {
 					args = append(args, "percent", int(*r.Percent))
+					if prev, ok := prevFanReadings[r.Name]; ok && prev.Percent != nil {
+						args = append(args, "delta", int(*r.Percent-*prev.Percent))
+					}
 				}
 				logger.Info("current fan speed", args...)
+				prevFanReadings[r.Name] = r
 			}
 		}
+	}
 
-		if cfg.DryRun {
-			logger.Info("dry run: skipping fan speed change", "system_percent", maxSpeed)
-		} else {
-			logger.Info("setting fan speed", "system_percent", maxSpeed)
-			if err := fanCtrl.SetSpeed(maxSpeed); err != nil {
-				logger.Error("failed to set fan speed", "error", err)
-			}
-		}
+	logFanSpeeds()
 
-		delay := time.Until(nextTick)
-		if delay < 0 {
-			delay = 0
-		}
+	fanLogTicker := time.NewTicker(cfg.FanLogInterval)
+	defer fanLogTicker.Stop()
+
+	for {
 		select {
 		case <-ctx.Done():
 			logger.Info("frostd stopping")
 			return
-		case <-time.After(delay):
+		case <-fanLogTicker.C:
+			logFanSpeeds()
+		case update := <-ch:
+			latestSpeeds[update.sensor] = update.speed
+
+			maxSpeed := 0
+			for _, s := range latestSpeeds {
+				if s > maxSpeed {
+					maxSpeed = s
+				}
+			}
+
+			if cfg.DryRun {
+				logger.Info("dry run: skipping fan speed change", "system_percent", maxSpeed)
+			} else {
+				logger.Info("setting fan speed", "system_percent", maxSpeed)
+				if err := fanCtrl.SetSpeed(maxSpeed); err != nil {
+					logger.Error("failed to set fan speed", "error", err)
+				}
+			}
 		}
 	}
 }
