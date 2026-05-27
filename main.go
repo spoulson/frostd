@@ -117,6 +117,8 @@ func main() {
 	fanLogTicker := time.NewTicker(cfg.FanLogInterval)
 	defer fanLogTicker.Stop()
 
+	pendingUpdate := false
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -126,21 +128,27 @@ func main() {
 			logFanSpeeds()
 		case update := <-ch:
 			latestSpeeds[update.sensor] = update.speed
+			pendingUpdate = true
+		}
 
-			maxSpeed := 0
-			for _, s := range latestSpeeds {
-				if s > maxSpeed {
-					maxSpeed = s
-				}
+		if !pendingUpdate {
+			continue
+		}
+		pendingUpdate = false
+
+		maxSpeed := 0
+		for _, s := range latestSpeeds {
+			if s > maxSpeed {
+				maxSpeed = s
 			}
+		}
 
-			if cfg.DryRun {
-				logger.Info("dry run: skipping fan speed change", "system_percent", maxSpeed)
-			} else {
-				logger.Info("setting fan speed", "system_percent", maxSpeed)
-				if err := fanCtrl.SetSpeed(ctx, maxSpeed); err != nil {
-					logger.Error("failed to set fan speed", "error", err)
-				}
+		if cfg.DryRun {
+			logger.Info("dry run: skipping fan speed change", "system_percent", maxSpeed)
+		} else {
+			logger.Info("setting fan speed", "system_percent", maxSpeed)
+			if err := fanCtrl.SetSpeed(ctx, maxSpeed); err != nil {
+				logger.Error("failed to set fan speed", "error", err)
 			}
 		}
 	}
