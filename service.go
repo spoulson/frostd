@@ -16,11 +16,11 @@ func run(ctx context.Context, cfg *Config, fanCtrl FanController, monitors []*Se
 	prevFanReadings := map[string]FanReading{}
 	logFanSpeeds(ctx, fanCtrl, logger, prevFanReadings)
 
-	ch := make(chan speedUpdate, len(monitors))
+	speedCh := make(chan speedUpdate, len(monitors))
 	latestSpeeds := make(map[string]int, len(monitors))
 	for _, m := range monitors {
 		latestSpeeds[m.name] = 0
-		go runSensor(ctx, m, logger, ch)
+		go runSensor(ctx, m, logger, speedCh)
 	}
 
 	fanLogTicker := time.NewTicker(cfg.FanLogInterval)
@@ -34,7 +34,7 @@ func run(ctx context.Context, cfg *Config, fanCtrl FanController, monitors []*Se
 			return
 		case <-fanLogTicker.C:
 			logFanSpeeds(ctx, fanCtrl, logger, prevFanReadings)
-		case update := <-ch:
+		case update := <-speedCh:
 			latestSpeeds[update.sensor] = update.speed
 			pendingUpdate = true
 		}
@@ -50,12 +50,11 @@ func run(ctx context.Context, cfg *Config, fanCtrl FanController, monitors []*Se
 				maxSpeed = s
 			}
 		}
-
-		if cfg.DryRun {
-			logger.Info("dry run: skipping fan speed change", "system_percent", maxSpeed)
+		if maxSpeed == lastSpeed {
 			continue
 		}
-		if maxSpeed == lastSpeed {
+		if cfg.DryRun {
+			logger.Info("dry run: skipping fan speed change", "system_percent", maxSpeed)
 			continue
 		}
 
