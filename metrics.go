@@ -3,7 +3,7 @@ package main
 import "fmt"
 
 type TempReader interface {
-	ReadTemperatures() ([]float64, error)
+	ReadTemperatures() (map[string]float64, error)
 }
 
 type SensorMonitor struct {
@@ -22,14 +22,15 @@ func newSensorMonitor(name string, cfg *SensorConfig, reader TempReader) *Sensor
 }
 
 // Poll reads current temperatures and updates the rolling sample buffer.
-// Returns the aggregate (average) temperature across all sensor IDs and samples.
-func (m *SensorMonitor) Poll() (float64, error) {
+// Returns the latest readings keyed by sensor ID, the aggregate (average)
+// across all sensor IDs and samples, and any error.
+func (m *SensorMonitor) Poll() (map[string]float64, float64, error) {
 	temps, err := m.reader.ReadTemperatures()
 	if err != nil {
-		return 0, fmt.Errorf("%s: reading temperatures: %w", m.name, err)
+		return nil, 0, fmt.Errorf("%s: reading temperatures: %w", m.name, err)
 	}
 	if len(temps) == 0 {
-		return 0, fmt.Errorf("%s: no temperature readings returned", m.name)
+		return nil, 0, fmt.Errorf("%s: no temperature readings returned", m.name)
 	}
 
 	var sum float64
@@ -43,7 +44,7 @@ func (m *SensorMonitor) Poll() (float64, error) {
 		m.samples = m.samples[len(m.samples)-m.cfg.SampleSize:]
 	}
 
-	return m.Aggregate(), nil
+	return temps, m.Aggregate(), nil
 }
 
 // Aggregate returns the average of collected samples.

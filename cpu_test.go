@@ -8,8 +8,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func makeProcessorTempSensor(value float64, entityInstance uint8) *ipmi.Sensor {
+func makeProcessorTempSensor(name string, value float64, entityInstance uint8) *ipmi.Sensor {
 	return &ipmi.Sensor{
+		Name:           name,
 		SensorType:     ipmi.SensorTypeTemperature,
 		EntityID:       ipmi.EntityID(0x03),
 		EntityInstance: ipmi.EntityInstance(entityInstance),
@@ -28,15 +29,15 @@ func makeInletTempSensor(value float64) *ipmi.Sensor {
 func TestCPUReader_ReturnsProcessorTemps(t *testing.T) {
 	mock := &mockIPMIClient{
 		sensors: []*ipmi.Sensor{
-			makeProcessorTempSensor(45, 1),
-			makeProcessorTempSensor(50, 2),
+			makeProcessorTempSensor("CPU1 Temp", 45, 1),
+			makeProcessorTempSensor("CPU2 Temp", 50, 2),
 			makeInletTempSensor(23),
 		},
 	}
 	reader := &CPUReader{newClient: mockIPMIFactory(mock)}
 	temps, err := reader.ReadTemperatures()
 	require.NoError(t, err)
-	assert.Equal(t, []float64{45, 50}, temps)
+	assert.Equal(t, map[string]float64{"CPU1 Temp": 45, "CPU2 Temp": 50}, temps)
 }
 
 func TestCPUReader_IgnoresNonProcessorSensors(t *testing.T) {

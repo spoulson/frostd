@@ -72,11 +72,11 @@ func runSensor(ctx context.Context, m *SensorMonitor, logger *slog.Logger, ch ch
 	for {
 		nextTick = nextTick.Add(m.cfg.SampleInterval)
 
-		agg, err := m.Poll()
+		temps, agg, err := m.Poll()
 		if err != nil {
 			logger.Error("sensor temperature poll failed", "sensor", m.name, "error", err)
 		} else {
-			logger.Info("sensor temperature", "sensor", m.name, "aggregate_temp", fmt.Sprintf("%.1f", agg))
+			logger.Info("sensor temperature", "sensor", m.name, "latest_temps", temps, "aggregate_temp", fmt.Sprintf("%.1f", agg))
 			speed := SuggestSpeed(agg, m.cfg.IdealTemp, m.cfg.MaxTemp)
 			logger.Info("sensor suggested fan speed", "sensor", m.name, "suggest_percent", speed)
 			select {
@@ -110,12 +110,6 @@ func logFanSpeeds(ctx context.Context, fanCtrl FanController, logger *slog.Logge
 			args = append(args, "rpm", int(*r.RPM))
 			if p, ok := prev[r.Name]; ok && p.RPM != nil {
 				args = append(args, "delta", int(*r.RPM-*p.RPM))
-			}
-		}
-		if r.Percent != nil {
-			args = append(args, "percent", int(*r.Percent))
-			if p, ok := prev[r.Name]; ok && p.Percent != nil {
-				args = append(args, "delta", int(*r.Percent-*p.Percent))
 			}
 		}
 		logger.Info("current fan speed", args...)
