@@ -3,6 +3,7 @@ package main
 import (
 	"testing"
 
+	ipmi "github.com/bougou/go-ipmi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -55,4 +56,72 @@ func TestIPMIFanController_SetSpeedIPMIError(t *testing.T) {
 func TestIPMIFanController_SetSpeedConnectError(t *testing.T) {
 	ctrl := &IPMIFanController{newClient: mockIPMIFactoryErr("no IPMI device")}
 	assert.Error(t, ctrl.SetSpeed(50))
+}
+
+func ptr[T any](v T) *T { return &v }
+
+func TestIPMIFanController_ReadFanSpeeds_RPM(t *testing.T) {
+	mock := &mockIPMIClient{
+		sensors: []*ipmi.Sensor{
+			{
+				Name:             "Fan1",
+				SensorType:       ipmi.SensorTypeFan,
+				HasAnalogReading: true,
+				Value:            3600,
+				SensorUnit:       ipmi.SensorUnit{BaseUnit: ipmi.SensorUnitType_RPM},
+			},
+		},
+	}
+	ctrl := &IPMIFanController{newClient: mockIPMIFactory(mock)}
+	readings, err := ctrl.ReadFanSpeeds()
+	require.NoError(t, err)
+	require.Len(t, readings, 1)
+	assert.Equal(t, "Fan1", readings[0].Name)
+	assert.Equal(t, ptr(3600.0), readings[0].RPM)
+	assert.Nil(t, readings[0].Percent)
+}
+
+func TestIPMIFanController_ReadFanSpeeds_Percent(t *testing.T) {
+	mock := &mockIPMIClient{
+		sensors: []*ipmi.Sensor{
+			{
+				Name:             "Fan1",
+				SensorType:       ipmi.SensorTypeFan,
+				HasAnalogReading: true,
+				Value:            50,
+				SensorUnit:       ipmi.SensorUnit{Percentage: true},
+			},
+		},
+	}
+	ctrl := &IPMIFanController{newClient: mockIPMIFactory(mock)}
+	readings, err := ctrl.ReadFanSpeeds()
+	require.NoError(t, err)
+	require.Len(t, readings, 1)
+	assert.Equal(t, ptr(50.0), readings[0].Percent)
+	assert.Nil(t, readings[0].RPM)
+}
+
+func TestIPMIFanController_ReadFanSpeeds_SkipsDiscrete(t *testing.T) {
+	mock := &mockIPMIClient{
+		sensors: []*ipmi.Sensor{
+			{Name: "Fan1", SensorType: ipmi.SensorTypeFan, HasAnalogReading: false},
+		},
+	}
+	ctrl := &IPMIFanController{newClient: mockIPMIFactory(mock)}
+	readings, err := ctrl.ReadFanSpeeds()
+	require.NoError(t, err)
+	assert.Empty(t, readings)
+}
+
+func TestIPMIFanController_ReadFanSpeeds_IPMIError(t *testing.T) {
+	mock := &mockIPMIClient{rawErr: errIPMI("sensor read failed")}
+	ctrl := &IPMIFanController{newClient: mockIPMIFactory(mock)}
+	_, err := ctrl.ReadFanSpeeds()
+	assert.Error(t, err)
+}
+
+func TestIPMIFanController_ReadFanSpeeds_ConnectError(t *testing.T) {
+	ctrl := &IPMIFanController{newClient: mockIPMIFactoryErr("no IPMI device")}
+	_, err := ctrl.ReadFanSpeeds()
+	assert.Error(t, err)
 }

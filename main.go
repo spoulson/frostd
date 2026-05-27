@@ -30,18 +30,18 @@ func main() {
 
 	fanCtrl := &IPMIFanController{newClient: newRealIPMIClient}
 
-	var monitors []*DeviceMonitor
+	var monitors []*SensorMonitor
 	var interval time.Duration
 
 	if cfg.CPU != nil {
-		m := newDeviceMonitor("cpu", cfg.CPU, &CPUReader{newClient: newRealIPMIClient})
+		m := newSensorMonitor("cpu", cfg.CPU, &CPUReader{newClient: newRealIPMIClient})
 		monitors = append(monitors, m)
 		if interval == 0 || cfg.CPU.SampleInterval < interval {
 			interval = cfg.CPU.SampleInterval
 		}
 	}
 	if cfg.GPU != nil {
-		m := newDeviceMonitor("gpu", cfg.GPU, &GPUReader{runner: RealRunner{}})
+		m := newSensorMonitor("gpu", cfg.GPU, &GPUReader{runner: RealRunner{}})
 		monitors = append(monitors, m)
 		if interval == 0 || cfg.GPU.SampleInterval < interval {
 			interval = cfg.GPU.SampleInterval
@@ -61,16 +61,31 @@ func main() {
 		for _, m := range monitors {
 			agg, err := m.Poll()
 			if err != nil {
-				logger.Error("temperature poll failed", "device", m.name, "error", err)
+				logger.Error("temperature poll failed", "sensor", m.name, "error", err)
 				continue
 			}
-			logger.Info("temperature", "device", m.name, "aggregate_celsius", fmt.Sprintf("%.1f", agg))
+			logger.Info("temperature", "sensor", m.name, "aggregate_temp", fmt.Sprintf("%.1f", agg))
 
 			speed := SuggestSpeed(agg, m.cfg.IdealTemp, m.cfg.MaxTemp)
 			if speed > maxSpeed {
 				maxSpeed = speed
 			}
-			logger.Info("suggested fan speed", "device", m.name, "required_percent", speed)
+			logger.Info("suggested fan speed", "sensor", m.name, "required_percent", speed)
+		}
+
+		if readings, err := fanCtrl.ReadFanSpeeds(); err != nil {
+			logger.Error("failed to read current fan speeds", "error", err)
+		} else {
+			for _, r := range readings {
+				args := []any{"fan", r.Name}
+				if r.RPM != nil {
+					args = append(args, "rpm", int(*r.RPM))
+				}
+				if r.Percent != nil {
+					args = append(args, "percent", int(*r.Percent))
+				}
+				logger.Info("current fan speed", args...)
+			}
 		}
 
 		if cfg.DryRun {

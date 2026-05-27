@@ -6,15 +6,15 @@ type TempReader interface {
 	ReadTemperatures() ([]float64, error)
 }
 
-type DeviceMonitor struct {
+type SensorMonitor struct {
 	name    string
-	cfg     *DeviceConfig
+	cfg     *SensorConfig
 	reader  TempReader
 	samples []float64
 }
 
-func newDeviceMonitor(name string, cfg *DeviceConfig, reader TempReader) *DeviceMonitor {
-	return &DeviceMonitor{
+func newSensorMonitor(name string, cfg *SensorConfig, reader TempReader) *SensorMonitor {
+	return &SensorMonitor{
 		name:   name,
 		cfg:    cfg,
 		reader: reader,
@@ -22,8 +22,8 @@ func newDeviceMonitor(name string, cfg *DeviceConfig, reader TempReader) *Device
 }
 
 // Poll reads current temperatures and updates the rolling sample buffer.
-// Returns the aggregate (average) temperature across all device IDs and samples.
-func (m *DeviceMonitor) Poll() (float64, error) {
+// Returns the aggregate (average) temperature across all sensor IDs and samples.
+func (m *SensorMonitor) Poll() (float64, error) {
 	temps, err := m.reader.ReadTemperatures()
 	if err != nil {
 		return 0, fmt.Errorf("%s: reading temperatures: %w", m.name, err)
@@ -47,7 +47,7 @@ func (m *DeviceMonitor) Poll() (float64, error) {
 }
 
 // Aggregate returns the average of collected samples.
-func (m *DeviceMonitor) Aggregate() float64 {
+func (m *SensorMonitor) Aggregate() float64 {
 	if len(m.samples) == 0 {
 		return 0
 	}

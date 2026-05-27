@@ -11,11 +11,11 @@ import (
 type Config struct {
 	LogFile string        `yaml:"log_file"`
 	DryRun  bool          `yaml:"dry_run"`
-	CPU     *DeviceConfig `yaml:"cpu"`
-	GPU     *DeviceConfig `yaml:"gpu"`
+	CPU     *SensorConfig `yaml:"cpu"`
+	GPU     *SensorConfig `yaml:"gpu"`
 }
 
-type DeviceConfig struct {
+type SensorConfig struct {
 	IdealTemp      float64       `yaml:"ideal_temp"`
 	MaxTemp        float64       `yaml:"max_temp"`
 	SampleSize     int           `yaml:"sample_size"`
@@ -40,14 +40,14 @@ func loadConfig(path string) (*Config, error) {
 
 func applyDefaults(cfg *Config) {
 	if cfg.CPU != nil {
-		applyDeviceDefaults(cfg.CPU)
+		applySensorDefaults(cfg.CPU)
 	}
 	if cfg.GPU != nil {
-		applyDeviceDefaults(cfg.GPU)
+		applySensorDefaults(cfg.GPU)
 	}
 }
 
-func applyDeviceDefaults(d *DeviceConfig) {
+func applySensorDefaults(d *SensorConfig) {
 	if d.IdealTemp == 0 {
 		d.IdealTemp = 40
 	}
@@ -64,22 +64,22 @@ func applyDeviceDefaults(d *DeviceConfig) {
 
 func validateConfig(cfg *Config) error {
 	if cfg.CPU == nil && cfg.GPU == nil {
-		return fmt.Errorf("config must enable at least one device type (cpu or gpu)")
+		return fmt.Errorf("config must enable at least one sensor type (cpu or gpu)")
 	}
 	if cfg.CPU != nil {
-		if err := validateDeviceConfig("cpu", cfg.CPU); err != nil {
+		if err := validateSensorConfig("cpu", cfg.CPU); err != nil {
 			return err
 		}
 	}
 	if cfg.GPU != nil {
-		if err := validateDeviceConfig("gpu", cfg.GPU); err != nil {
+		if err := validateSensorConfig("gpu", cfg.GPU); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func validateDeviceConfig(name string, d *DeviceConfig) error {
+func validateSensorConfig(name string, d *SensorConfig) error {
 	if d.IdealTemp <= 0 {
 		return fmt.Errorf("%s: ideal_temp must be positive, got %.1f", name, d.IdealTemp)
 	}

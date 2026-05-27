@@ -76,7 +76,7 @@ func TestLoadConfig_Defaults(t *testing.T) {
 func TestLoadConfig_NoDevices(t *testing.T) {
 	path := writeTempConfig(t, `log_file: /tmp/test.log`)
 	_, err := loadConfig(path)
-	assert.ErrorContains(t, err, "at least one device type")
+	assert.ErrorContains(t, err, "at least one sensor type")
 }
 
 func TestLoadConfig_IdealTempEqualMaxTemp(t *testing.T) {

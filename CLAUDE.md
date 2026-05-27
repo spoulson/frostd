@@ -13,17 +13,17 @@ servers based on hardware temperature metrics.
 `frostd` identifies supported devices and actively monitors metrics and adjusts
 chassis fan speed using IPMI.
 
-## Device Metrics
+## Sensor Metrics
 
-Devices are grouped by device type.  Each device type has zero or more device
+Devices are grouped by sensor type.  Each sensor type has zero or more sensor
 IDs.
 
-### CPU Device Metrics
+### CPU Sensor Metrics
 
 `frostd` uses IPMI to read CPU temperatures of each package.  Each package is
-listed as a device ID.
+listed as a sensor ID.
 
-### NVIDIA Tesla P40 GPU Device Metrics
+### NVIDIA Tesla P40 GPU Sensor Metrics
 
 `frostd` supports monitoring of an optional NVIDIA Tesla P40 GPU.  frostd uses
 `nvidia-smi` command to read GPU temperature.
@@ -41,7 +41,7 @@ ideal and maximum device temperatures and an easing formula.
 
 ### Suggestion Algorithm
 
-For each device type, read the temperature and compute aggregate temperature
+For each sensor type, read the temperature and compute aggregate temperature
 metric from average of last _n_ samples.
 
 The default easing type is "parabolic".  Compute the suggested fan speed for
@@ -62,7 +62,7 @@ highest speed.
 - `ideal_temp` is the lower bound temperature at which fans will be run at
 lowest speed.
 - `max_temp` and `ideal_temp` are configured per device.
-- `actual_temp` is the device aggregate temperature metric.
+- `actual_temp` is the sensor aggregate temperature metric.
 - Set fan speed to the max `suggested_speed` computed from all devices. This
 ensures adequate airflow for the device that needs it most.
 
@@ -71,14 +71,14 @@ ensures adequate airflow for the device that needs it most.
 frostd reads a YAML config file in the default path `/etc/frostd.yaml` or
 overridden by specifying CLI argument `-c <file>`.
 
-The YAML config specifies which device types to monitor: CPU and/or NVIDIA
-Tesla P40 GPU.  Each device type includes settings for:
+The YAML config specifies which sensor types to monitor: CPU and/or NVIDIA
+Tesla P40 GPU.  Each sensor type includes settings for:
 - ideal temperature in Celcius (Default 40)
 - maximum temperature in Celcius (Default 75)
 - sample size (Default 3)
 - sample time interval (Default 15s)
 
-All instances of a device type will be discovered (e.g. multiple CPU packages,
+All instances of a sensor type will be discovered (e.g. multiple CPU packages,
 multiple GPUs).
 
 Log file output file is specified (Default `/var/log/frostd/frostd.log`).
@@ -157,7 +157,7 @@ contains validation errors, log a descriptive error message and exit.
 If there are errors reading temperature metrics, log a descriptive error and
 retry on next iteration.
 
-Log all device temperature metrics, computed aggregate metrics, and suggested
+Log all sensor temperature metrics, computed aggregate metrics, and suggested
 fan speed.
 
 If there are errors setting fan speed, log a descriptive error.  Retry on the

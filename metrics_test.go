@@ -18,8 +18,8 @@ func (r *staticReader) ReadTemperatures() ([]float64, error) {
 	return r.temps, r.err
 }
 
-func testDeviceConfig() *DeviceConfig {
-	return &DeviceConfig{
+func testSensorConfig() *SensorConfig {
+	return &SensorConfig{
 		IdealTemp:      40,
 		MaxTemp:        75,
 		SampleSize:     3,
@@ -27,20 +27,20 @@ func testDeviceConfig() *DeviceConfig {
 	}
 }
 
-func TestDeviceMonitor_AccumulatesSamples(t *testing.T) {
+func TestSensorMonitor_AccumulatesSamples(t *testing.T) {
 	reader := &staticReader{temps: []float64{50, 60}}
-	m := newDeviceMonitor("cpu", testDeviceConfig(), reader)
+	m := newSensorMonitor("cpu", testSensorConfig(), reader)
 	agg, err := m.Poll()
 	require.NoError(t, err)
 	assert.Len(t, m.samples, 1)
 	assert.Equal(t, 55.0, agg) // avg of [50,60]
 }
 
-func TestDeviceMonitor_CapsSamplesAtSampleSize(t *testing.T) {
-	cfg := testDeviceConfig()
+func TestSensorMonitor_CapsSamplesAtSampleSize(t *testing.T) {
+	cfg := testSensorConfig()
 	cfg.SampleSize = 3
 	reader := &staticReader{temps: []float64{0}}
-	m := newDeviceMonitor("cpu", cfg, reader)
+	m := newSensorMonitor("cpu", cfg, reader)
 
 	for i := 0; i < 5; i++ {
 		reader.temps = []float64{float64(i * 10)}
@@ -52,28 +52,28 @@ func TestDeviceMonitor_CapsSamplesAtSampleSize(t *testing.T) {
 	assert.Equal(t, (20.0+30.0+40.0)/3, m.Aggregate())
 }
 
-func TestDeviceMonitor_AggregateBeforeAnyPolls(t *testing.T) {
-	m := newDeviceMonitor("cpu", testDeviceConfig(), &staticReader{temps: []float64{50}})
+func TestSensorMonitor_AggregateBeforeAnyPolls(t *testing.T) {
+	m := newSensorMonitor("cpu", testSensorConfig(), &staticReader{temps: []float64{50}})
 	assert.Equal(t, 0.0, m.Aggregate())
 }
 
-func TestDeviceMonitor_ReaderError(t *testing.T) {
+func TestSensorMonitor_ReaderError(t *testing.T) {
 	reader := &staticReader{err: errors.New("ipmitool failed")}
-	m := newDeviceMonitor("cpu", testDeviceConfig(), reader)
+	m := newSensorMonitor("cpu", testSensorConfig(), reader)
 	_, err := m.Poll()
 	assert.Error(t, err)
 }
 
-func TestDeviceMonitor_EmptyReadings(t *testing.T) {
+func TestSensorMonitor_EmptyReadings(t *testing.T) {
 	reader := &staticReader{temps: []float64{}}
-	m := newDeviceMonitor("cpu", testDeviceConfig(), reader)
+	m := newSensorMonitor("cpu", testSensorConfig(), reader)
 	_, err := m.Poll()
 	assert.Error(t, err)
 }
 
-func TestDeviceMonitor_MultipleDeviceIDsAveraged(t *testing.T) {
+func TestSensorMonitor_MultipleSensorIDsAveraged(t *testing.T) {
 	reader := &staticReader{temps: []float64{50, 70}}
-	m := newDeviceMonitor("cpu", testDeviceConfig(), reader)
+	m := newSensorMonitor("cpu", testSensorConfig(), reader)
 	agg, err := m.Poll()
 	require.NoError(t, err)
 	assert.Equal(t, 60.0, agg)

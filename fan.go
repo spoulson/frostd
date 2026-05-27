@@ -20,12 +20,56 @@ func SuggestSpeed(actualTemp, idealTemp, maxTemp float64) int {
 	return int(math.Round(speed))
 }
 
+type FanReading struct {
+	Name    string
+	RPM     *float64
+	Percent *float64
+}
+
 type FanController interface {
+	ReadFanSpeeds() ([]FanReading, error)
 	SetSpeed(percent int) error
 }
 
 type IPMIFanController struct {
 	newClient func() (ipmiClient, error)
+}
+
+// ReadFanSpeeds returns current readings from all IPMI fan sensors.
+// Each reading includes RPM if the sensor reports in RPM, or percent if the sensor reports as a percentage.
+func (c *IPMIFanController) ReadFanSpeeds() ([]FanReading, error) {
+	ctx := context.Background()
+	client, err := c.newClient()
+	if err != nil {
+		return nil, fmt.Errorf("creating IPMI client: %w", err)
+	}
+	if err := client.Connect(ctx); err != nil {
+		return nil, fmt.Errorf("connecting to IPMI: %w", err)
+	}
+	defer client.Close(ctx)
+
+	sensors, err := client.GetSensors(ctx,
+		ipmi.SensorFilterOptionIsSensorType(ipmi.SensorTypeFan))
+	if err != nil {
+		return nil, fmt.Errorf("getting IPMI fan sensors: %w", err)
+	}
+
+	var readings []FanReading
+	for _, s := range sensors {
+		if !s.HasAnalogReading {
+			continue
+		}
+		r := FanReading{Name: s.Name}
+		if s.SensorUnit.Percentage {
+			v := s.Value
+			r.Percent = &v
+		} else if s.SensorUnit.BaseUnit == ipmi.SensorUnitType_RPM {
+			v := s.Value
+			r.RPM = &v
+		}
+		readings = append(readings, r)
+	}
+	return readings, nil
 }
 
 // SetSpeed sets the chassis fan speed to the given percentage [0,100].
