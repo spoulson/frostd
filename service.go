@@ -53,12 +53,13 @@ func run(ctx context.Context, cfg *Config, fanCtrl FanController, monitors []*Se
 		if maxSpeed == lastSpeed {
 			continue
 		}
+		lastSpeed = maxSpeed
+
 		if cfg.DryRun {
 			logger.Info("dry run: skipping fan speed change", "system_percent", maxSpeed)
 			continue
 		}
 
-		lastSpeed = maxSpeed
 		logger.Info("setting fan speed", "system_percent", maxSpeed)
 		if err := fanCtrl.SetSpeed(ctx, maxSpeed); err != nil {
 			logger.Error("failed to set fan speed", "error", err)
