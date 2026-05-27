@@ -24,6 +24,7 @@ lint: $(GOLANGCI_LINT)
 .PHONY: install
 install: build
 	test -f /etc/frostd.yaml || sudo cp frostd.yaml /etc/frostd.yaml
+	sudo cp packaging/frostd.logrotate /etc/logrotate.d/frostd
 	sudo sed "s|ExecStart=.*|ExecStart=$(CURDIR)/$(BINARY)|" \
 	    packaging/frostd.service \
 	    | sudo tee /etc/systemd/system/frostd.service > /dev/null
