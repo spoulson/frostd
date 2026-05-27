@@ -31,7 +31,14 @@ func parseGPUTemps(output string) (map[string]float64, error) {
 		if err != nil {
 			return nil, fmt.Errorf("parsing GPU temperature %q: %w", line, err)
 		}
-		temps[fmt.Sprintf("gpu%d", len(temps))] = temp
+		key := "gpu"
+		for i := 2; ; i++ {
+			if _, exists := temps[key]; !exists {
+				break
+			}
+			key = fmt.Sprintf("gpu_%d", i)
+		}
+		temps[key] = temp
 	}
 	if len(temps) == 0 {
 		return nil, fmt.Errorf("no GPU temperatures found in nvidia-smi output")
