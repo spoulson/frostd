@@ -10,6 +10,7 @@ import (
 
 type Config struct {
 	LogFile        string        `yaml:"log_file"`
+	LogFormat      string        `yaml:"log_format"`
 	DryRun         bool          `yaml:"dry_run"`
 	FanLogInterval time.Duration `yaml:"fan_log_interval"`
 	CPU            *SensorConfig `yaml:"cpu"`
@@ -40,6 +41,9 @@ func loadConfig(path string) (*Config, error) {
 }
 
 func applyDefaults(cfg *Config) {
+	if cfg.LogFormat == "" {
+		cfg.LogFormat = "text"
+	}
 	if cfg.FanLogInterval == 0 {
 		cfg.FanLogInterval = 15 * time.Second
 	}
@@ -69,6 +73,9 @@ func applySensorDefaults(d *SensorConfig) {
 func validateConfig(cfg *Config) error {
 	if cfg.CPU == nil && cfg.GPU == nil {
 		return fmt.Errorf("config must enable at least one sensor type (cpu or gpu)")
+	}
+	if cfg.LogFormat != "text" && cfg.LogFormat != "json" {
+		return fmt.Errorf("log_format must be \"text\" or \"json\", got %q", cfg.LogFormat)
 	}
 	if cfg.FanLogInterval <= 0 {
 		return fmt.Errorf("fan_log_interval must be positive, got %s", cfg.FanLogInterval)

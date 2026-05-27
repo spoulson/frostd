@@ -1,4 +1,5 @@
 log_file: /var/log/frostd/frostd.log
+log_format: json
 dry_run: false
 
 cpu:

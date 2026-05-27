@@ -68,10 +68,30 @@ func TestLoadConfig_Defaults(t *testing.T) {
 	path := writeTempConfig(t, `cpu: {}`)
 	cfg, err := loadConfig(path)
 	require.NoError(t, err)
+	assert.Equal(t, "text", cfg.LogFormat)
 	assert.Equal(t, 40.0, cfg.CPU.IdealTemp)
 	assert.Equal(t, 75.0, cfg.CPU.MaxTemp)
 	assert.Equal(t, 3, cfg.CPU.SampleSize)
 	assert.Equal(t, 15*time.Second, cfg.CPU.SampleInterval)
+}
+
+func TestLoadConfig_LogFormatJSON(t *testing.T) {
+	path := writeTempConfig(t, `
+log_format: json
+cpu: {}
+`)
+	cfg, err := loadConfig(path)
+	require.NoError(t, err)
+	assert.Equal(t, "json", cfg.LogFormat)
+}
+
+func TestLoadConfig_LogFormatInvalid(t *testing.T) {
+	path := writeTempConfig(t, `
+log_format: xml
+cpu: {}
+`)
+	_, err := loadConfig(path)
+	assert.ErrorContains(t, err, "log_format")
 }
 
 func TestLoadConfig_NoDevices(t *testing.T) {

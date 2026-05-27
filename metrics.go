@@ -22,8 +22,8 @@ func newSensorMonitor(name string, cfg *SensorConfig, reader TempReader) *Sensor
 }
 
 // Poll reads current temperatures and updates the rolling sample buffer.
-// Returns the latest readings keyed by sensor ID, the aggregate (average)
-// across all sensor IDs and samples, and any error.
+// Returns the latest readings keyed by sensor ID, the aggregate (average of
+// per-poll maximums) across samples, and any error.
 func (m *SensorMonitor) Poll() (map[string]float64, float64, error) {
 	temps, err := m.reader.ReadTemperatures()
 	if err != nil {
@@ -33,13 +33,14 @@ func (m *SensorMonitor) Poll() (map[string]float64, float64, error) {
 		return nil, 0, fmt.Errorf("%s: no temperature readings returned", m.name)
 	}
 
-	var sum float64
+	var maxTemp float64
 	for _, t := range temps {
-		sum += t
+		if t > maxTemp {
+			maxTemp = t
+		}
 	}
-	avg := sum / float64(len(temps))
 
-	m.samples = append(m.samples, avg)
+	m.samples = append(m.samples, maxTemp)
 	if len(m.samples) > m.cfg.SampleSize {
 		m.samples = m.samples[len(m.samples)-m.cfg.SampleSize:]
 	}

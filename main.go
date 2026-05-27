@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -39,7 +40,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	logger, closer, err := setupLogger(cfg.LogFile)
+	logger, closer, err := setupLogger(cfg.LogFile, cfg.LogFormat)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "frostd: failed to open log file: %v\n", err)
 		os.Exit(1)
@@ -64,20 +65,27 @@ func main() {
 	logger.Info("frostd stopping")
 }
 
-func setupLogger(logFile string) (*slog.Logger, func(), error) {
-	if logFile == "" {
-		return slog.New(slog.NewTextHandler(os.Stdout, nil)), func() {}, nil
+func setupLogger(logFile, logFormat string) (*slog.Logger, func(), error) {
+	var w io.Writer = os.Stdout
+	closer := func() {}
+
+	if logFile != "" {
+		if err := os.MkdirAll(filepath.Dir(logFile), 0o755); err != nil {
+			return nil, nil, err
+		}
+		f, err := os.OpenFile(logFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+		if err != nil {
+			return nil, nil, err
+		}
+		w = f
+		closer = func() { _ = f.Close() }
 	}
-	if err := os.MkdirAll(filepath.Dir(logFile), 0o755); err != nil {
-		return nil, nil, err
+
+	var handler slog.Handler
+	if logFormat == "json" {
+		handler = slog.NewJSONHandler(w, nil)
+	} else {
+		handler = slog.NewTextHandler(w, nil)
 	}
-	f, err := os.OpenFile(logFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
-	if err != nil {
-		return nil, nil, err
-	}
-	logger := slog.New(slog.NewTextHandler(f, nil))
-	closer := func() {
-		_ = f.Close()
-	}
-	return logger, closer, nil
+	return slog.New(handler), closer, nil
 }

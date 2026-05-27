@@ -34,7 +34,7 @@ func TestSensorMonitor_AccumulatesSamples(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, map[string]float64{"s0": 50, "s1": 60}, temps)
 	assert.Len(t, m.samples, 1)
-	assert.Equal(t, 55.0, agg) // avg of [50,60]
+	assert.Equal(t, 60.0, agg) // max of [50,60]
 }
 
 func TestSensorMonitor_CapsSamplesAtSampleSize(t *testing.T) {
@@ -72,11 +72,11 @@ func TestSensorMonitor_EmptyReadings(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestSensorMonitor_MultipleSensorIDsAveraged(t *testing.T) {
+func TestSensorMonitor_MultipleSensorIDsMax(t *testing.T) {
 	reader := &staticReader{temps: map[string]float64{"s0": 50, "s1": 70}}
 	m := newSensorMonitor("cpu", testSensorConfig(), reader)
 	temps, agg, err := m.Poll()
 	require.NoError(t, err)
 	assert.Equal(t, map[string]float64{"s0": 50, "s1": 70}, temps)
-	assert.Equal(t, 60.0, agg)
+	assert.Equal(t, 70.0, agg)
 }
