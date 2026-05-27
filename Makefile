@@ -12,7 +12,7 @@ run:
 
 .PHONY: test
 test:
-	go test ./...
+	go test -race ./...
 
 $(GOLANGCI_LINT):
 	curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ./bin $(GOLANGCI_LINT_VERSION)
@@ -23,7 +23,7 @@ lint: $(GOLANGCI_LINT)
 
 .PHONY: install
 install: build
-	sudo cp frostd.yaml /etc/frostd.yaml
+	test -f /etc/frostd.yaml || sudo cp frostd.yaml /etc/frostd.yaml
 	sudo sed "s|ExecStart=.*|ExecStart=$(CURDIR)/$(BINARY)|" \
 	    packaging/frostd.service \
 	    | sudo tee /etc/systemd/system/frostd.service > /dev/null
@@ -37,6 +37,12 @@ uninstall:
 	sudo systemctl disable frostd || true
 	sudo rm -f /etc/systemd/system/frostd.service
 	sudo systemctl daemon-reload
+
+.PHONY: uninstall_clean
+uninstall_clean: uninstall
+	LOG_FILE=$$(awk '/^log_file:/{print $$2}' /etc/frostd.yaml 2>/dev/null); \
+	sudo rm -f /etc/frostd.yaml; \
+	if [ -n "$$LOG_FILE" ]; then sudo rm -f "$$LOG_FILE"; fi
 
 .PHONY: package
 package: build
