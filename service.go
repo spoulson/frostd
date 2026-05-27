@@ -46,7 +46,9 @@ func run(ctx context.Context, cfg *Config, fanCtrl FanController, monitors []*Se
 		pendingUpdate = false
 		maxSpeed := 0
 		for _, s := range latestSpeeds {
-			s = max(s, maxSpeed)
+			if s > maxSpeed {
+				maxSpeed = s
+			}
 		}
 
 		if cfg.DryRun {
