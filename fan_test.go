@@ -37,25 +37,25 @@ func TestSuggestSpeed_ThreeQuarterTemp(t *testing.T) {
 func TestIPMIFanController_SetSpeed(t *testing.T) {
 	mock := &mockIPMIClient{}
 	ctrl := &IPMIFanController{newClient: mockIPMIFactory(mock)}
-	require.NoError(t, ctrl.SetSpeed(50))
+	require.NoError(t, ctrl.SetSpeed(t.Context(), 50))
 }
 
 func TestIPMIFanController_SetSpeedOutOfRange(t *testing.T) {
 	mock := &mockIPMIClient{}
 	ctrl := &IPMIFanController{newClient: mockIPMIFactory(mock)}
-	assert.Error(t, ctrl.SetSpeed(101))
-	assert.Error(t, ctrl.SetSpeed(-1))
+	assert.Error(t, ctrl.SetSpeed(t.Context(), 101))
+	assert.Error(t, ctrl.SetSpeed(t.Context(), -1))
 }
 
 func TestIPMIFanController_SetSpeedIPMIError(t *testing.T) {
 	mock := &mockIPMIClient{rawErr: errIPMI("raw command failed")}
 	ctrl := &IPMIFanController{newClient: mockIPMIFactory(mock)}
-	assert.Error(t, ctrl.SetSpeed(50))
+	assert.Error(t, ctrl.SetSpeed(t.Context(), 50))
 }
 
 func TestIPMIFanController_SetSpeedConnectError(t *testing.T) {
 	ctrl := &IPMIFanController{newClient: mockIPMIFactoryErr("no IPMI device")}
-	assert.Error(t, ctrl.SetSpeed(50))
+	assert.Error(t, ctrl.SetSpeed(t.Context(), 50))
 }
 
 func ptr[T any](v T) *T { return &v }
@@ -73,7 +73,7 @@ func TestIPMIFanController_ReadFanSpeeds_RPM(t *testing.T) {
 		},
 	}
 	ctrl := &IPMIFanController{newClient: mockIPMIFactory(mock)}
-	readings, err := ctrl.ReadFanSpeeds()
+	readings, err := ctrl.ReadFanSpeeds(t.Context())
 	require.NoError(t, err)
 	require.Len(t, readings, 1)
 	assert.Equal(t, "Fan1", readings[0].Name)
@@ -94,7 +94,7 @@ func TestIPMIFanController_ReadFanSpeeds_Percent(t *testing.T) {
 		},
 	}
 	ctrl := &IPMIFanController{newClient: mockIPMIFactory(mock)}
-	readings, err := ctrl.ReadFanSpeeds()
+	readings, err := ctrl.ReadFanSpeeds(t.Context())
 	require.NoError(t, err)
 	require.Len(t, readings, 1)
 	assert.Equal(t, ptr(50.0), readings[0].Percent)
@@ -108,7 +108,7 @@ func TestIPMIFanController_ReadFanSpeeds_SkipsDiscrete(t *testing.T) {
 		},
 	}
 	ctrl := &IPMIFanController{newClient: mockIPMIFactory(mock)}
-	readings, err := ctrl.ReadFanSpeeds()
+	readings, err := ctrl.ReadFanSpeeds(t.Context())
 	require.NoError(t, err)
 	assert.Empty(t, readings)
 }
@@ -116,12 +116,12 @@ func TestIPMIFanController_ReadFanSpeeds_SkipsDiscrete(t *testing.T) {
 func TestIPMIFanController_ReadFanSpeeds_IPMIError(t *testing.T) {
 	mock := &mockIPMIClient{rawErr: errIPMI("sensor read failed")}
 	ctrl := &IPMIFanController{newClient: mockIPMIFactory(mock)}
-	_, err := ctrl.ReadFanSpeeds()
+	_, err := ctrl.ReadFanSpeeds(t.Context())
 	assert.Error(t, err)
 }
 
 func TestIPMIFanController_ReadFanSpeeds_ConnectError(t *testing.T) {
 	ctrl := &IPMIFanController{newClient: mockIPMIFactoryErr("no IPMI device")}
-	_, err := ctrl.ReadFanSpeeds()
+	_, err := ctrl.ReadFanSpeeds(t.Context())
 	assert.Error(t, err)
 }

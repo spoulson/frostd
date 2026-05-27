@@ -89,7 +89,7 @@ func main() {
 
 	prevFanReadings := map[string]FanReading{}
 	logFanSpeeds := func() {
-		if readings, err := fanCtrl.ReadFanSpeeds(); err != nil {
+		if readings, err := fanCtrl.ReadFanSpeeds(ctx); err != nil {
 			logger.Error("failed to read current fan speeds", "error", err)
 		} else {
 			for _, r := range readings {
@@ -138,7 +138,7 @@ func main() {
 				logger.Info("dry run: skipping fan speed change", "system_percent", maxSpeed)
 			} else {
 				logger.Info("setting fan speed", "system_percent", maxSpeed)
-				if err := fanCtrl.SetSpeed(maxSpeed); err != nil {
+				if err := fanCtrl.SetSpeed(ctx, maxSpeed); err != nil {
 					logger.Error("failed to set fan speed", "error", err)
 				}
 			}

@@ -27,8 +27,8 @@ type FanReading struct {
 }
 
 type FanController interface {
-	ReadFanSpeeds() ([]FanReading, error)
-	SetSpeed(percent int) error
+	ReadFanSpeeds(ctx context.Context) ([]FanReading, error)
+	SetSpeed(ctx context.Context, percent int) error
 }
 
 type IPMIFanController struct {
@@ -37,8 +37,7 @@ type IPMIFanController struct {
 
 // ReadFanSpeeds returns current readings from all IPMI fan sensors.
 // Each reading includes RPM if the sensor reports in RPM, or percent if the sensor reports as a percentage.
-func (c *IPMIFanController) ReadFanSpeeds() ([]FanReading, error) {
-	ctx := context.Background()
+func (c *IPMIFanController) ReadFanSpeeds(ctx context.Context) ([]FanReading, error) {
 	client, err := c.newClient()
 	if err != nil {
 		return nil, fmt.Errorf("creating IPMI client: %w", err)
@@ -74,12 +73,11 @@ func (c *IPMIFanController) ReadFanSpeeds() ([]FanReading, error) {
 
 // SetSpeed sets the chassis fan speed to the given percentage [0,100].
 // It uses Dell OEM IPMI raw commands to enable manual fan control and set the speed.
-func (c *IPMIFanController) SetSpeed(percent int) error {
+func (c *IPMIFanController) SetSpeed(ctx context.Context, percent int) error {
 	if percent < 0 || percent > 100 {
 		return fmt.Errorf("fan speed %d out of range [0,100]", percent)
 	}
 
-	ctx := context.Background()
 	client, err := c.newClient()
 	if err != nil {
 		return fmt.Errorf("creating IPMI client: %w", err)
