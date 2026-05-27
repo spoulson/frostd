@@ -22,7 +22,9 @@ func (r *CPUReader) ReadTemperatures() (map[string]float64, error) {
 	if err := client.Connect(ctx); err != nil {
 		return nil, fmt.Errorf("connecting to IPMI: %w", err)
 	}
-	defer client.Close(ctx)
+	defer func() {
+		_ = client.Close(ctx)
+	}()
 
 	sensors, err := client.GetSensors(ctx,
 		ipmi.SensorFilterOptionIsSensorType(ipmi.SensorTypeTemperature))

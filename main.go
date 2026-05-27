@@ -76,5 +76,8 @@ func setupLogger(logFile string) (*slog.Logger, func(), error) {
 		return nil, nil, err
 	}
 	logger := slog.New(slog.NewTextHandler(f, nil))
-	return logger, func() { f.Close() }, nil
+	closer := func() {
+		_ = f.Close()
+	}
+	return logger, closer, nil
 }

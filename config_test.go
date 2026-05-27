@@ -15,7 +15,8 @@ func writeTempConfig(t *testing.T, content string) string {
 	require.NoError(t, err)
 	_, err = f.WriteString(content)
 	require.NoError(t, err)
-	f.Close()
+	err = f.Close()
+	require.NoError(t, err)
 	return f.Name()
 }
 

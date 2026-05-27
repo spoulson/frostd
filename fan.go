@@ -13,7 +13,9 @@ func SuggestSpeed(actualTemp, idealTemp, maxTemp float64) int {
 	if actualTemp <= idealTemp {
 		return 0
 	}
-	speed := math.Pow(actualTemp-idealTemp, 2) * (100 / math.Pow(maxTemp-idealTemp, 2))
+	deltaTemp1 := actualTemp - idealTemp
+	deltaTemp2 := maxTemp - idealTemp
+	speed := (deltaTemp1 * deltaTemp1) * (100 / (deltaTemp2 * deltaTemp2))
 	if speed > 100 {
 		return 100
 	}
@@ -45,7 +47,9 @@ func (c *IPMIFanController) ReadFanSpeeds(ctx context.Context) ([]FanReading, er
 	if err := client.Connect(ctx); err != nil {
 		return nil, fmt.Errorf("connecting to IPMI: %w", err)
 	}
-	defer client.Close(ctx)
+	defer func() {
+		_ = client.Close(ctx)
+	}()
 
 	sensors, err := client.GetSensors(ctx,
 		ipmi.SensorFilterOptionIsSensorType(ipmi.SensorTypeFan))
@@ -85,7 +89,9 @@ func (c *IPMIFanController) SetSpeed(ctx context.Context, percent int) error {
 	if err := client.Connect(ctx); err != nil {
 		return fmt.Errorf("connecting to IPMI: %w", err)
 	}
-	defer client.Close(ctx)
+	defer func() {
+		_ = client.Close(ctx)
+	}()
 
 	// Dell OEM: enable manual fan control
 	if _, err := client.RawCommand(ctx, ipmi.NetFn(0x30), 0x30, []byte{0x01, 0x00}, ""); err != nil {
