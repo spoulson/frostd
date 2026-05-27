@@ -47,6 +47,31 @@ func runSensor(ctx context.Context, m *SensorMonitor, logger *slog.Logger, ch ch
 	}
 }
 
+func logFanSpeeds(ctx context.Context, fanCtrl FanController, logger *slog.Logger, prev map[string]FanReading) {
+	readings, err := fanCtrl.ReadFanSpeeds(ctx)
+	if err != nil {
+		logger.Error("failed to read current fan speeds", "error", err)
+		return
+	}
+	for _, r := range readings {
+		args := []any{"fan", r.Name}
+		if r.RPM != nil {
+			args = append(args, "rpm", int(*r.RPM))
+			if p, ok := prev[r.Name]; ok && p.RPM != nil {
+				args = append(args, "delta", int(*r.RPM-*p.RPM))
+			}
+		}
+		if r.Percent != nil {
+			args = append(args, "percent", int(*r.Percent))
+			if p, ok := prev[r.Name]; ok && p.Percent != nil {
+				args = append(args, "delta", int(*r.Percent-*p.Percent))
+			}
+		}
+		logger.Info("current fan speed", args...)
+		prev[r.Name] = r
+	}
+}
+
 func main() {
 	configPath := flag.String("c", "/etc/frostd.yaml", "path to config file")
 	flag.Parse()
@@ -80,39 +105,17 @@ func main() {
 
 	logger.Info("frostd started", "config", *configPath, "dry_run", cfg.DryRun)
 
+	prevFanReadings := map[string]FanReading{}
+
+	// Initial fan speed log.
+	logFanSpeeds(ctx, fanCtrl, logger, prevFanReadings)
+
 	ch := make(chan speedUpdate, len(monitors))
 	latestSpeeds := make(map[string]int, len(monitors))
 	for _, m := range monitors {
 		latestSpeeds[m.name] = 0
 		go runSensor(ctx, m, logger, ch)
 	}
-
-	prevFanReadings := map[string]FanReading{}
-	logFanSpeeds := func() {
-		if readings, err := fanCtrl.ReadFanSpeeds(ctx); err != nil {
-			logger.Error("failed to read current fan speeds", "error", err)
-		} else {
-			for _, r := range readings {
-				args := []any{"fan", r.Name}
-				if r.RPM != nil {
-					args = append(args, "rpm", int(*r.RPM))
-					if prev, ok := prevFanReadings[r.Name]; ok && prev.RPM != nil {
-						args = append(args, "delta", int(*r.RPM-*prev.RPM))
-					}
-				}
-				if r.Percent != nil {
-					args = append(args, "percent", int(*r.Percent))
-					if prev, ok := prevFanReadings[r.Name]; ok && prev.Percent != nil {
-						args = append(args, "delta", int(*r.Percent-*prev.Percent))
-					}
-				}
-				logger.Info("current fan speed", args...)
-				prevFanReadings[r.Name] = r
-			}
-		}
-	}
-
-	logFanSpeeds()
 
 	fanLogTicker := time.NewTicker(cfg.FanLogInterval)
 	defer fanLogTicker.Stop()
@@ -125,7 +128,7 @@ func main() {
 			logger.Info("frostd stopping")
 			return
 		case <-fanLogTicker.C:
-			logFanSpeeds()
+			logFanSpeeds(ctx, fanCtrl, logger, prevFanReadings)
 		case update := <-ch:
 			latestSpeeds[update.sensor] = update.speed
 			pendingUpdate = true
