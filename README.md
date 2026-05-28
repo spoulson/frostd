@@ -6,18 +6,23 @@ metrics. It reads CPU temperatures via IPMI and optionally GPU temperatures via
 `nvidia-smi`, then applies a parabolic easing curve to derive a fan speed
 percentage that keeps hardware cool without running fans harder than necessary.
 
-## Why not use automatic fans?
+Configure a temperature range between ideal (lowest fan speed) to maximum
+(highest fan speed). `frostd` adjusts fan speed to safely land somewhere in this
+range.
 
-The BMC can dynamically adjust fan speed to keep CPU temps cool, but it doesn't
-know how to regulate GPU temps.
+## Why not use the server's built-in automatic fan mode?
 
-Additionally, the BMC settings are non-adjustable.  With `frostd` it is
-possible to set much lower fan speeds than usual and still keep all components
-cool.  This allows for a measurable power reduction at idle.
+The Baseboard Management Controller (BMC) can dynamically adjust fan speed to
+keep CPU temps cool, but it doesn't know how to regulate GPU temps.
+
+Additionally, the BMC settings are non-adjustable. With `frostd` it is possible
+to set much lower fan speeds than usual and still keep all components cool.
+This allows for a measurable power reduction at idle.
 
 ## Features
 
-- Monitors CPU package temperatures via IPMI (no `ipmitool` dependency)
+- Monitors CPU package temperatures via IPMI natively (no dependency on
+`ipmitool`)
 - Optional NVIDIA GPU temperature monitoring via `nvidia-smi`
 - Parabolic fan speed curve between configurable ideal and maximum temperatures
 - Independent polling intervals per sensor type
@@ -41,7 +46,7 @@ cool.  This allows for a measurable power reduction at idle.
 make build
 ```
 
-The compiled binary is written to `./frostd`.
+The compiled executable is written to `./frostd`.
 
 ### Run from source
 
@@ -71,7 +76,7 @@ This will:
 make uninstall
 ```
 
-This reverts an install from `make install`.  Stops and removes the systemd
+This reverts an install from `make install`. It stops and removes the systemd
 service. The configuration file and logs are preserved.
 
 ```sh
@@ -119,7 +124,7 @@ Both `cpu` and `gpu` sections are optional, but at least one must be enabled.
 |-------------------|----------|---------|-------------|
 | `ideal_temp`      | float    | `40`    | Temperature (°C) at which fans run at minimum speed. |
 | `max_temp`        | float    | `75`    | Temperature (°C) at which fans run at full speed. |
-| `sample_size`     | int      | `3`     | Number of polling samples to retain in the rolling window. |
+| `sample_size`     | int      | `3`     | Number of polling samples to retain in the rolling average. |
 | `sample_interval` | duration | `15s`   | How often to poll temperature for this sensor type. |
 
 ### Fan speed algorithm
