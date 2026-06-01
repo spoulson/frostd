@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
 )
@@ -82,17 +81,25 @@ func (s *Service) runSensor(ctx context.Context, m *SensorMonitor, ch chan<- spe
 	for {
 		nextTick = nextTick.Add(m.cfg.SampleInterval)
 
-		temps, agg, err := m.Poll()
+		temps, aggs, err := m.Poll()
 		if err != nil {
 			s.logger.Error("sensor temperature poll failed", "sensor", m.name, "error", err)
 		} else {
-			s.logger.Info("sensor temperature", "sensor", m.name, "latest_temps", temps, "aggregate_temp", fmt.Sprintf("%.1f", agg))
-			speed := SuggestSpeed(agg, m.cfg.IdealTemp, m.cfg.MaxTemp)
+			s.logger.Info("sensor temperature", "sensor", m.name, "latest_temps", temps, "aggregate_temps", aggs)
+			var maxAgg float64
+			for _, a := range aggs {
+				if a > maxAgg {
+					maxAgg = a
+				}
+			}
+			speed := SuggestSpeed(maxAgg, m.cfg.IdealTemp, m.cfg.MaxTemp)
 			s.logger.Info("sensor suggested fan speed", "sensor", m.name, "suggest_percent", speed)
 			for id, t := range temps {
-				s.prom.deviceTemp.WithLabelValues(m.name, id).Set(t)
+				s.prom.sensorTemp.WithLabelValues(m.name, id).Set(t)
 			}
-			s.prom.aggregateTemp.WithLabelValues(m.name).Set(agg)
+			for id, a := range aggs {
+				s.prom.aggregateTemp.WithLabelValues(m.name, id).Set(a)
+			}
 			s.prom.suggestedSpeed.WithLabelValues(m.name).Set(float64(speed))
 			select {
 			case ch <- speedUpdate{sensor: m.name, speed: speed}:

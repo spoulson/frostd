@@ -30,11 +30,11 @@ func testSensorConfig() *SensorConfig {
 func TestSensorMonitor_AccumulatesSamples(t *testing.T) {
 	reader := &staticReader{temps: map[string]float64{"s0": 50, "s1": 60}}
 	m := newSensorMonitor("cpu", testSensorConfig(), reader)
-	temps, agg, err := m.Poll()
+	temps, aggs, err := m.Poll()
 	require.NoError(t, err)
 	assert.Equal(t, map[string]float64{"s0": 50, "s1": 60}, temps)
-	assert.Len(t, m.samples, 1)
-	assert.Equal(t, 60.0, agg) // max of [50,60]
+	assert.Len(t, m.samples, 2)
+	assert.Equal(t, map[string]float64{"s0": 50.0, "s1": 60.0}, aggs)
 }
 
 func TestSensorMonitor_CapsSamplesAtSampleSize(t *testing.T) {
@@ -48,14 +48,14 @@ func TestSensorMonitor_CapsSamplesAtSampleSize(t *testing.T) {
 		_, _, err := m.Poll()
 		require.NoError(t, err)
 	}
-	assert.Len(t, m.samples, 3)
+	assert.Len(t, m.samples["s0"], 3)
 	// last 3 polls: 20, 30, 40
-	assert.Equal(t, (20.0+30.0+40.0)/3, m.Aggregate())
+	assert.Equal(t, (20.0+30.0+40.0)/3, m.Aggregates()["s0"])
 }
 
-func TestSensorMonitor_AggregateBeforeAnyPolls(t *testing.T) {
+func TestSensorMonitor_AggregatesBeforeAnyPolls(t *testing.T) {
 	m := newSensorMonitor("cpu", testSensorConfig(), &staticReader{temps: map[string]float64{"s0": 50}})
-	assert.Equal(t, 0.0, m.Aggregate())
+	assert.Empty(t, m.Aggregates())
 }
 
 func TestSensorMonitor_ReaderError(t *testing.T) {
@@ -72,11 +72,18 @@ func TestSensorMonitor_EmptyReadings(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestSensorMonitor_MultipleSensorIDsMax(t *testing.T) {
+func TestSensorMonitor_MultipleSensorIDsHaveIndependentAggregates(t *testing.T) {
+	cfg := testSensorConfig()
+	cfg.SampleSize = 2
 	reader := &staticReader{temps: map[string]float64{"s0": 50, "s1": 70}}
-	m := newSensorMonitor("cpu", testSensorConfig(), reader)
-	temps, agg, err := m.Poll()
+	m := newSensorMonitor("cpu", cfg, reader)
+
+	_, _, err := m.Poll()
 	require.NoError(t, err)
-	assert.Equal(t, map[string]float64{"s0": 50, "s1": 70}, temps)
-	assert.Equal(t, 70.0, agg)
+	reader.temps = map[string]float64{"s0": 60, "s1": 80}
+	_, aggs, err := m.Poll()
+	require.NoError(t, err)
+
+	assert.Equal(t, (50.0+60.0)/2, aggs["s0"])
+	assert.Equal(t, (70.0+80.0)/2, aggs["s1"])
 }

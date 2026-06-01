@@ -10,7 +10,7 @@ import (
 )
 
 type PrometheusMetrics struct {
-	deviceTemp      *prometheus.GaugeVec
+	sensorTemp      *prometheus.GaugeVec
 	aggregateTemp   *prometheus.GaugeVec
 	suggestedSpeed  *prometheus.GaugeVec
 	fanSpeedRPM     *prometheus.GaugeVec
@@ -22,14 +22,14 @@ type PrometheusMetrics struct {
 func newPrometheusMetrics() *PrometheusMetrics {
 	reg := prometheus.NewRegistry()
 	m := &PrometheusMetrics{
-		deviceTemp: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		sensorTemp: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Name: "frostd_sensor_temperature",
-			Help: "Current temperature reading per device sensor, in Celsius.",
+			Help: "Current temperature reading per sensor, in Celsius.",
 		}, []string{"sensor", "id"}),
 		aggregateTemp: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Name: "frostd_sensor_aggregate_temperature",
 			Help: "Rolling aggregate temperature per sensor type, in Celsius.",
-		}, []string{"sensor"}),
+		}, []string{"sensor", "id"}),
 		suggestedSpeed: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Name: "frostd_suggested_fan_speed_percent",
 			Help: "Suggested fan speed percentage per sensor type.",
@@ -49,7 +49,7 @@ func newPrometheusMetrics() *PrometheusMetrics {
 		registry: reg,
 	}
 	reg.MustRegister(
-		m.deviceTemp,
+		m.sensorTemp,
 		m.aggregateTemp,
 		m.suggestedSpeed,
 		m.fanSpeedRPM,
