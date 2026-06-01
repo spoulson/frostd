@@ -23,11 +23,11 @@ func newPrometheusMetrics() *PrometheusMetrics {
 	reg := prometheus.NewRegistry()
 	m := &PrometheusMetrics{
 		deviceTemp: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Name: "frostd_device_temperature",
+			Name: "frostd_sensor_temperature",
 			Help: "Current temperature reading per device sensor, in Celsius.",
 		}, []string{"sensor", "id"}),
 		aggregateTemp: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Name: "frostd_device_aggregate_temperature",
+			Name: "frostd_sensor_aggregate_temperature",
 			Help: "Rolling aggregate temperature per sensor type, in Celsius.",
 		}, []string{"sensor"}),
 		suggestedSpeed: prometheus.NewGaugeVec(prometheus.GaugeOpts{

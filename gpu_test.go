@@ -11,13 +11,13 @@ import (
 func TestGPUReader_ParsesSingleGPU(t *testing.T) {
 	temps, err := parseGPUTemps("72\n")
 	require.NoError(t, err)
-	assert.Equal(t, map[string]float64{"gpu": 72}, temps)
+	assert.Equal(t, map[string]float64{"Temp": 72}, temps)
 }
 
 func TestGPUReader_ParsesMultipleGPUs(t *testing.T) {
 	temps, err := parseGPUTemps("68\n74\n")
 	require.NoError(t, err)
-	assert.Equal(t, map[string]float64{"gpu": 68, "gpu_2": 74}, temps)
+	assert.Equal(t, map[string]float64{"Temp": 68, "Temp_2": 74}, temps)
 }
 
 func TestGPUReader_EmptyOutput(t *testing.T) {
@@ -35,7 +35,7 @@ func TestGPUReader_ReadTemperatures_CallsNvidiaSmi(t *testing.T) {
 	reader := &GPUReader{runner: r}
 	temps, err := reader.ReadTemperatures()
 	require.NoError(t, err)
-	assert.Equal(t, map[string]float64{"gpu": 72}, temps)
+	assert.Equal(t, map[string]float64{"Temp": 72}, temps)
 }
 
 func TestGPUReader_ReadTemperatures_CommandError(t *testing.T) {

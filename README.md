@@ -129,8 +129,8 @@ Optional. Omit the section (or leave `listen_addr` empty) to disable.
 
 | Metric                                       | Labels          | Description |
 |----------------------------------------------|-----------------|-------------|
-| `frostd_device_temperature`                  | `sensor`, `id`  | Current temperature reading per sensor ID, in Celsius. |
-| `frostd_device_aggregate_temperature`        | `sensor`        | Rolling aggregate temperature used for fan speed calculation, in Celsius. |
+| `frostd_sensor_temperature`                  | `sensor`, `id`  | Current temperature reading per sensor ID, in Celsius. |
+| `frostd_sensor_aggregate_temperature`        | `sensor`        | Rolling aggregate temperature used for fan speed calculation, in Celsius. |
 | `frostd_suggested_fan_speed_percent`         | `sensor`        | Fan speed percentage suggested by this sensor type. |
 | `frostd_actual_fan_rpm`                      | `fan`           | Actual fan speed in RPM (for fans that report RPM). |
 | `frostd_actual_fan_speed_percent`            | `fan`           | Actual fan speed as a percentage (for fans that report percent). |

@@ -31,12 +31,12 @@ func parseGPUTemps(output string) (map[string]float64, error) {
 		if err != nil {
 			return nil, fmt.Errorf("parsing GPU temperature %q: %w", line, err)
 		}
-		key := "gpu"
+		key := "Temp"
 		for i := 2; ; i++ {
 			if _, exists := temps[key]; !exists {
 				break
 			}
-			key = fmt.Sprintf("gpu_%d", i)
+			key = fmt.Sprintf("Temp_%d", i)
 		}
 		temps[key] = temp
 	}
