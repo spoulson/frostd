@@ -2,6 +2,9 @@ log_file: /var/log/frostd/frostd.log
 log_format: json
 dry_run: false
 
+# prometheus:
+#   listen_addr: ":9100"
+
 cpu:
   ideal_temp: 40
   max_temp: 75

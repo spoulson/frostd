@@ -154,3 +154,33 @@ func TestLoadConfig_MissingFile(t *testing.T) {
 	_, err := loadConfig("/nonexistent/path/frostd.yaml")
 	assert.Error(t, err)
 }
+
+func TestLoadConfig_PrometheusWithListenAddr(t *testing.T) {
+	path := writeTempConfig(t, `
+cpu: {}
+prometheus:
+  listen_addr: ":9100"
+`)
+	cfg, err := loadConfig(path)
+	require.NoError(t, err)
+	require.NotNil(t, cfg.Prometheus)
+	assert.Equal(t, ":9100", cfg.Prometheus.ListenAddr)
+}
+
+func TestLoadConfig_PrometheusAbsent(t *testing.T) {
+	path := writeTempConfig(t, `cpu: {}`)
+	cfg, err := loadConfig(path)
+	require.NoError(t, err)
+	assert.Nil(t, cfg.Prometheus)
+}
+
+func TestLoadConfig_PrometheusEmptyListenAddr(t *testing.T) {
+	path := writeTempConfig(t, `
+cpu: {}
+prometheus: {}
+`)
+	cfg, err := loadConfig(path)
+	require.NoError(t, err)
+	require.NotNil(t, cfg.Prometheus)
+	assert.Equal(t, "", cfg.Prometheus.ListenAddr)
+}

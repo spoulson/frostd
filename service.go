@@ -12,18 +12,26 @@ type speedUpdate struct {
 	speed  int
 }
 
-func run(ctx context.Context, cfg *Config, fanCtrl FanController, monitors []*SensorMonitor, logger *slog.Logger) {
-	prevFanReadings := map[string]FanReading{}
-	logFanSpeeds(ctx, fanCtrl, logger, prevFanReadings)
+type Service struct {
+	cfg      *Config
+	fanCtrl  FanController
+	monitors []*SensorMonitor
+	logger   *slog.Logger
+	prom     *PrometheusMetrics
+}
 
-	speedCh := make(chan speedUpdate, len(monitors))
-	latestSpeeds := make(map[string]int, len(monitors))
-	for _, m := range monitors {
+func (s *Service) run(ctx context.Context) {
+	prevFanReadings := map[string]FanReading{}
+	s.logFanSpeeds(ctx, prevFanReadings)
+
+	speedCh := make(chan speedUpdate, len(s.monitors))
+	latestSpeeds := make(map[string]int, len(s.monitors))
+	for _, m := range s.monitors {
 		latestSpeeds[m.name] = 0
-		go runSensor(ctx, m, logger, speedCh)
+		go s.runSensor(ctx, m, speedCh)
 	}
 
-	fanLogTicker := time.NewTicker(cfg.FanLogInterval)
+	fanLogTicker := time.NewTicker(s.cfg.FanLogInterval)
 	defer fanLogTicker.Stop()
 	pendingUpdate := false
 	lastSpeed := -1
@@ -33,7 +41,7 @@ func run(ctx context.Context, cfg *Config, fanCtrl FanController, monitors []*Se
 		case <-ctx.Done():
 			return
 		case <-fanLogTicker.C:
-			logFanSpeeds(ctx, fanCtrl, logger, prevFanReadings)
+			s.logFanSpeeds(ctx, prevFanReadings)
 		case update := <-speedCh:
 			latestSpeeds[update.sensor] = update.speed
 			pendingUpdate = true
@@ -55,30 +63,37 @@ func run(ctx context.Context, cfg *Config, fanCtrl FanController, monitors []*Se
 		}
 		lastSpeed = maxSpeed
 
-		if cfg.DryRun {
-			logger.Info("dry run: skipping fan speed change", "system_percent", maxSpeed)
+		s.prom.systemSpeed.Set(float64(maxSpeed))
+
+		if s.cfg.DryRun {
+			s.logger.Info("dry run: skipping fan speed change", "system_percent", maxSpeed)
 			continue
 		}
 
-		logger.Info("setting fan speed", "system_percent", maxSpeed)
-		if err := fanCtrl.SetSpeed(ctx, maxSpeed); err != nil {
-			logger.Error("failed to set fan speed", "error", err)
+		s.logger.Info("setting fan speed", "system_percent", maxSpeed)
+		if err := s.fanCtrl.SetSpeed(ctx, maxSpeed); err != nil {
+			s.logger.Error("failed to set fan speed", "error", err)
 		}
 	}
 }
 
-func runSensor(ctx context.Context, m *SensorMonitor, logger *slog.Logger, ch chan<- speedUpdate) {
+func (s *Service) runSensor(ctx context.Context, m *SensorMonitor, ch chan<- speedUpdate) {
 	nextTick := time.Now()
 	for {
 		nextTick = nextTick.Add(m.cfg.SampleInterval)
 
 		temps, agg, err := m.Poll()
 		if err != nil {
-			logger.Error("sensor temperature poll failed", "sensor", m.name, "error", err)
+			s.logger.Error("sensor temperature poll failed", "sensor", m.name, "error", err)
 		} else {
-			logger.Info("sensor temperature", "sensor", m.name, "latest_temps", temps, "aggregate_temp", fmt.Sprintf("%.1f", agg))
+			s.logger.Info("sensor temperature", "sensor", m.name, "latest_temps", temps, "aggregate_temp", fmt.Sprintf("%.1f", agg))
 			speed := SuggestSpeed(agg, m.cfg.IdealTemp, m.cfg.MaxTemp)
-			logger.Info("sensor suggested fan speed", "sensor", m.name, "suggest_percent", speed)
+			s.logger.Info("sensor suggested fan speed", "sensor", m.name, "suggest_percent", speed)
+			for id, t := range temps {
+				s.prom.deviceTemp.WithLabelValues(m.name, id).Set(t)
+			}
+			s.prom.aggregateTemp.WithLabelValues(m.name).Set(agg)
+			s.prom.suggestedSpeed.WithLabelValues(m.name).Set(float64(speed))
 			select {
 			case ch <- speedUpdate{sensor: m.name, speed: speed}:
 			case <-ctx.Done():
@@ -98,10 +113,10 @@ func runSensor(ctx context.Context, m *SensorMonitor, logger *slog.Logger, ch ch
 	}
 }
 
-func logFanSpeeds(ctx context.Context, fanCtrl FanController, logger *slog.Logger, prev map[string]FanReading) {
-	readings, err := fanCtrl.ReadFanSpeeds(ctx)
+func (s *Service) logFanSpeeds(ctx context.Context, prev map[string]FanReading) {
+	readings, err := s.fanCtrl.ReadFanSpeeds(ctx)
 	if err != nil {
-		logger.Error("failed to read current fan speeds", "error", err)
+		s.logger.Error("failed to read current fan speeds", "error", err)
 		return
 	}
 	for _, r := range readings {
@@ -111,8 +126,12 @@ func logFanSpeeds(ctx context.Context, fanCtrl FanController, logger *slog.Logge
 			if p, ok := prev[r.Name]; ok && p.RPM != nil {
 				args = append(args, "delta", int(*r.RPM-*p.RPM))
 			}
+			s.prom.fanSpeedRPM.WithLabelValues(r.Name).Set(*r.RPM)
 		}
-		logger.Info("current fan speed", args...)
+		if r.Percent != nil {
+			s.prom.fanSpeedPercent.WithLabelValues(r.Name).Set(*r.Percent)
+		}
+		s.logger.Info("current fan speed", args...)
 		prev[r.Name] = r
 	}
 }

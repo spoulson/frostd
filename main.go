@@ -60,8 +60,19 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
+	svc := &Service{
+		cfg:      cfg,
+		fanCtrl:  fanCtrl,
+		monitors: monitors,
+		logger:   logger,
+		prom:     newPrometheusMetrics(),
+	}
+	if cfg.Prometheus != nil && cfg.Prometheus.ListenAddr != "" {
+		startPrometheusServer(ctx, cfg.Prometheus.ListenAddr, svc.prom, logger)
+	}
+
 	logger.Info("frostd started", "config", a.configPath, "dry_run", cfg.DryRun)
-	run(ctx, cfg, fanCtrl, monitors, logger)
+	svc.run(ctx)
 	logger.Info("frostd stopping")
 }
 

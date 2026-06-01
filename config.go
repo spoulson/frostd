@@ -9,12 +9,17 @@ import (
 )
 
 type Config struct {
-	LogFile        string        `yaml:"log_file"`
-	LogFormat      string        `yaml:"log_format"`
-	DryRun         bool          `yaml:"dry_run"`
-	FanLogInterval time.Duration `yaml:"fan_log_interval"`
-	CPU            *SensorConfig `yaml:"cpu"`
-	GPU            *SensorConfig `yaml:"gpu"`
+	LogFile        string            `yaml:"log_file"`
+	LogFormat      string            `yaml:"log_format"`
+	DryRun         bool              `yaml:"dry_run"`
+	FanLogInterval time.Duration     `yaml:"fan_log_interval"`
+	Prometheus     *PrometheusConfig `yaml:"prometheus"`
+	CPU            *SensorConfig     `yaml:"cpu"`
+	GPU            *SensorConfig     `yaml:"gpu"`
+}
+
+type PrometheusConfig struct {
+	ListenAddr string `yaml:"listen_addr"`
 }
 
 type SensorConfig struct {

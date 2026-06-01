@@ -29,6 +29,7 @@ This allows for a measurable power reduction at idle.
 - Rolling sample window to smooth transient temperature spikes
 - Dry-run mode for observing behaviour without changing fan speeds
 - Structured logging (text or JSON) to file or stdout
+- Optional Prometheus metrics endpoint
 - Runs as a systemd service
 
 ## Requirements
@@ -109,12 +110,31 @@ frostd -c /path/to/config.yaml
 
 ### Top-level options
 
-| Field              | Type     | Default                        | Description |
-|--------------------|----------|--------------------------------|-------------|
-| `log_file`         | string   | *(stdout)*                     | Path to log file. Leave empty to log to stdout. |
-| `log_format`       | string   | `text`                         | Log format: `text` or `json`. |
-| `dry_run`          | bool     | `false`                        | Log suggested fan speeds without applying them. |
-| `fan_log_interval` | duration | `15s`                          | How often to log current fan speeds. |
+| Field              | Type     | Default    | Description |
+|--------------------|----------|------------|-------------|
+| `log_file`         | string   | *(stdout)* | Path to log file. Leave empty to log to stdout. |
+| `log_format`       | string   | `text`     | Log format: `text` or `json`. |
+| `dry_run`          | bool     | `false`    | Log suggested fan speeds without applying them. |
+| `fan_log_interval` | duration | `15s`      | How often to log current fan speeds. |
+
+### Prometheus options (`prometheus`)
+
+Optional. Omit the section (or leave `listen_addr` empty) to disable.
+
+| Field         | Type   | Default | Description |
+|---------------|--------|---------|-------------|
+| `listen_addr` | string | *(none)*| `host:port` to bind the metrics HTTP server. When set, `GET /metrics` exposes Prometheus metrics. |
+
+#### Exported metrics
+
+| Metric                                       | Labels          | Description |
+|----------------------------------------------|-----------------|-------------|
+| `frostd_device_temperature`                  | `sensor`, `id`  | Current temperature reading per sensor ID, in Celsius. |
+| `frostd_device_aggregate_temperature`        | `sensor`        | Rolling aggregate temperature used for fan speed calculation, in Celsius. |
+| `frostd_suggested_fan_speed_percent`         | `sensor`        | Fan speed percentage suggested by this sensor type. |
+| `frostd_actual_fan_rpm`                      | `fan`           | Actual fan speed in RPM (for fans that report RPM). |
+| `frostd_actual_fan_speed_percent`            | `fan`           | Actual fan speed as a percentage (for fans that report percent). |
+| `frostd_system_fan_speed_percent`            | *(none)*        | Commanded system fan speed — the highest suggestion across all sensor types. |
 
 ### Sensor options (`cpu` / `gpu`)
 
@@ -148,6 +168,9 @@ log_file: /var/log/frostd/frostd.log
 log_format: json
 dry_run: false
 fan_log_interval: 15s
+
+prometheus:
+  listen_addr: ":9100"
 
 cpu:
   ideal_temp: 40
