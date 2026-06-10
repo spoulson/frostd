@@ -1,0 +1,9 @@
+Package: frostd
+Version: 1.0.0
+Section: utils
+Priority: optional
+Architecture: amd64
+Maintainer: Shawn Poulson <shawn@ethn.net>
+Description: Dell PowerEdge fan speed regulator
+ frostd dynamically regulates fan speeds on Dell PowerEdge 12th generation
+ servers based on CPU and GPU temperature metrics read via IPMI and nvidia-smi.

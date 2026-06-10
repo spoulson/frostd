@@ -1,0 +1,102 @@
+package main
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"io"
+	"log/slog"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"syscall"
+)
+
+const version = "0.1.0"
+
+type args struct {
+	configPath  string
+	showVersion bool
+}
+
+func parseArgs() args {
+	configPath := flag.String("c", "/etc/frostd.yaml", "path to config file")
+	showVersion := flag.Bool("version", false, "print version and exit")
+	flag.Parse()
+	return args{configPath: *configPath, showVersion: *showVersion}
+}
+
+func main() {
+	a := parseArgs()
+
+	if a.showVersion {
+		fmt.Println(version)
+		return
+	}
+
+	cfg, err := loadConfig(a.configPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "frostd: configuration error: %v\n", err)
+		os.Exit(1)
+	}
+
+	logger, closer, err := setupLogger(cfg.LogFile, cfg.LogFormat)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "frostd: failed to open log file: %v\n", err)
+		os.Exit(1)
+	}
+	defer closer()
+
+	fanCtrl := &IPMIFanController{newClient: newRealIPMIClient}
+
+	var monitors []*SensorMonitor
+	if cfg.CPU != nil {
+		monitors = append(monitors, newSensorMonitor("cpu", cfg.CPU, &CPUReader{newClient: newRealIPMIClient}))
+	}
+	if cfg.GPU != nil {
+		monitors = append(monitors, newSensorMonitor("gpu", cfg.GPU, &GPUReader{runner: RealRunner{}}))
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
+
+	svc := &Service{
+		cfg:      cfg,
+		fanCtrl:  fanCtrl,
+		monitors: monitors,
+		logger:   logger,
+		prom:     newPrometheusMetrics(),
+	}
+	if cfg.Prometheus != nil && cfg.Prometheus.ListenAddr != "" {
+		startPrometheusServer(ctx, cfg.Prometheus.ListenAddr, svc.prom, logger)
+	}
+
+	logger.Info("frostd started", "config", a.configPath, "dry_run", cfg.DryRun)
+	svc.run(ctx)
+	logger.Info("frostd stopping")
+}
+
+func setupLogger(logFile, logFormat string) (*slog.Logger, func(), error) {
+	var w io.Writer = os.Stdout
+	closer := func() {}
+
+	if logFile != "" {
+		if err := os.MkdirAll(filepath.Dir(logFile), 0o755); err != nil {
+			return nil, nil, err
+		}
+		f, err := os.OpenFile(logFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+		if err != nil {
+			return nil, nil, err
+		}
+		w = f
+		closer = func() { _ = f.Close() }
+	}
+
+	var handler slog.Handler
+	if logFormat == "json" {
+		handler = slog.NewJSONHandler(w, nil)
+	} else {
+		handler = slog.NewTextHandler(w, nil)
+	}
+	return slog.New(handler), closer, nil
+}

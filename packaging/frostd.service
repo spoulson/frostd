@@ -1,0 +1,12 @@
+[Unit]
+Description=frostd - Dell PowerEdge fan speed regulator
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/frostd
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
