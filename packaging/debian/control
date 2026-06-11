@@ -4,6 +4,7 @@ Section: utils
 Priority: optional
 Architecture: amd64
 Maintainer: Shawn Poulson <shawn@ethn.net>
+Depends: libfreeipmi17 | libfreeipmi-dev, libipmimonitoring6 | libipmimonitoring-dev, libcyaml1, libmicrohttpd12 | libmicrohttpd12t64
 Description: Dell PowerEdge fan speed regulator
  frostd dynamically regulates fan speeds on Dell PowerEdge 12th generation
  servers based on CPU and GPU temperature metrics read via IPMI and nvidia-smi.
