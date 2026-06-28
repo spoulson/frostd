@@ -15,9 +15,11 @@ SRCS = src/config.c src/cpu.c src/fan.c src/gpu.c src/ipmi.c \
 TEST_SRCS = tests/test_config.c tests/test_metrics.c tests/test_fan.c \
             tests/test_gpu.c tests/test_cpu.c
 
-.PHONY: build
-build:
+$(BINARY): $(SRCS)
 	$(CC) $(CFLAGS) -o $(BINARY) src/main.c $(SRCS) $(LIBS)
+
+.PHONY: build
+build: $(BINARY)
 
 .PHONY: run
 run: build
@@ -25,16 +27,16 @@ run: build
 
 .PHONY: test
 test:
-	$(CC) $(TEST_CFLAGS) -o /tmp/test_config  src/config.c src/log.c \
-	    tests/test_config.c $(TEST_LIBS) && /tmp/test_config
-	$(CC) $(TEST_CFLAGS) -o /tmp/test_metrics src/metrics.c \
-	    tests/test_metrics.c tests/test_helpers.c $(TEST_LIBS) && /tmp/test_metrics
-	$(CC) $(TEST_CFLAGS) -o /tmp/test_fan     src/fan.c src/metrics.c \
-	    tests/test_fan.c tests/test_helpers.c $(TEST_LIBS) -lm && /tmp/test_fan
-	$(CC) $(TEST_CFLAGS) -o /tmp/test_gpu     src/gpu.c \
-	    tests/test_gpu.c tests/test_helpers.c $(TEST_LIBS) && /tmp/test_gpu
-	$(CC) $(TEST_CFLAGS) -o /tmp/test_cpu     src/cpu.c \
-	    tests/test_cpu.c tests/test_helpers.c $(TEST_LIBS) && /tmp/test_cpu
+	$(CC) $(TEST_CFLAGS) -o test_config  src/config.c src/log.c \
+	    tests/test_config.c $(TEST_LIBS) && ./test_config
+	$(CC) $(TEST_CFLAGS) -o test_metrics src/metrics.c \
+	    tests/test_metrics.c tests/test_helpers.c $(TEST_LIBS) && ./test_metrics
+	$(CC) $(TEST_CFLAGS) -o test_fan     src/fan.c src/metrics.c \
+	    tests/test_fan.c tests/test_helpers.c $(TEST_LIBS) -lm && ./test_fan
+	$(CC) $(TEST_CFLAGS) -o test_gpu     src/gpu.c \
+	    tests/test_gpu.c tests/test_helpers.c $(TEST_LIBS) && ./test_gpu
+	$(CC) $(TEST_CFLAGS) -o test_cpu     src/cpu.c \
+	    tests/test_cpu.c tests/test_helpers.c $(TEST_LIBS) && ./test_cpu
 
 .PHONY: lint
 lint:
@@ -45,7 +47,7 @@ lint:
 
 .PHONY: clean
 clean:
-	rm -f $(BINARY)
+	rm -f $(BINARY) test_config test_metrics test_fan test_gpu test_cpu
 
 .PHONY: install
 install: build
