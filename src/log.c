@@ -30,10 +30,12 @@ static void iso8601_now(char *buf, size_t len) {
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
     struct tm tm;
-    gmtime_r(&ts.tv_sec, &tm);
+    localtime_r(&ts.tv_sec, &tm);
     char tmp[32];
     strftime(tmp, sizeof(tmp), "%Y-%m-%dT%H:%M:%S", &tm);
-    snprintf(buf, len, "%s.%03ldZ", tmp, ts.tv_nsec / 1000000L);
+    char tz[8];
+    strftime(tz, sizeof(tz), "%z", &tm);
+    snprintf(buf, len, "%s.%03ld%s", tmp, ts.tv_nsec / 1000000L, tz);
 }
 
 static void write_json_str(FILE *out, const char *s) {
