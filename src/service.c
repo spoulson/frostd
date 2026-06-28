@@ -190,6 +190,7 @@ void service_run(service_t *svc) {
             if (rc == ETIMEDOUT) {
                 pthread_mutex_unlock(&svc->bus.lock);
                 log_fan_speeds(svc, prev_fans, &prev_fan_count);
+                clock_gettime(CLOCK_MONOTONIC, &fan_log_deadline);
                 timespec_add_sec(&fan_log_deadline, svc->cfg->fan_log_interval_sec);
                 pthread_mutex_lock(&svc->bus.lock);
             }
