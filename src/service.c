@@ -23,6 +23,20 @@ static void timespec_add_sec(struct timespec *ts, double seconds) {
     }
 }
 
+/* Returns nonzero if a is strictly before b. */
+static int timespec_lt(const struct timespec *a, const struct timespec *b) {
+    if (a->tv_sec != b->tv_sec) return a->tv_sec < b->tv_sec;
+    return a->tv_nsec < b->tv_nsec;
+}
+
+/*
+ * Signals are delivered to a single thread, and neither clock_nanosleep nor
+ * pthread_cond_timedwait wake up early on signal delivery. Cap every wait to
+ * this granularity so every thread notices g_shutdown promptly regardless of
+ * which thread the signal landed on.
+ */
+#define SHUTDOWN_POLL_SEC 1.0
+
 /* ---- sensor thread ---- */
 
 static void *sensor_thread(void *arg) {
@@ -77,16 +91,16 @@ static void *sensor_thread(void *arg) {
             pthread_mutex_unlock(&bus->lock);
         }
 
-        /* Sleep until next_tick */
+        /* Sleep until next_tick, polling g_shutdown so a signal delivered to
+         * another thread is still noticed promptly. */
         struct timespec now;
         clock_gettime(CLOCK_MONOTONIC, &now);
-        if (now.tv_sec < next_tick.tv_sec ||
-            (now.tv_sec == next_tick.tv_sec && now.tv_nsec < next_tick.tv_nsec)) {
-            while (!g_shutdown) {
-                int rc = clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME,
-                                          &next_tick, NULL);
-                if (rc == 0 || rc == EINTR) break;
-            }
+        while (!g_shutdown && timespec_lt(&now, &next_tick)) {
+            struct timespec wake = now;
+            timespec_add_sec(&wake, SHUTDOWN_POLL_SEC);
+            if (timespec_lt(&next_tick, &wake)) wake = next_tick;
+            clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &wake, NULL);
+            clock_gettime(CLOCK_MONOTONIC, &now);
         }
     }
     return NULL;
@@ -190,14 +204,23 @@ void service_run(service_t *svc) {
         /* Wait for a speed update or fan-log timeout */
         pthread_mutex_lock(&svc->bus.lock);
         while (!svc->bus.updated && !g_shutdown) {
+            struct timespec now;
+            clock_gettime(CLOCK_MONOTONIC, &now);
+            struct timespec wake = now;
+            timespec_add_sec(&wake, SHUTDOWN_POLL_SEC);
+            if (timespec_lt(&fan_log_deadline, &wake)) wake = fan_log_deadline;
+
             int rc = pthread_cond_timedwait(&svc->bus.cond, &svc->bus.lock,
-                                             &fan_log_deadline);
+                                             &wake);
             if (rc == ETIMEDOUT) {
-                pthread_mutex_unlock(&svc->bus.lock);
-                log_fan_speeds(svc, prev_fans, &prev_fan_count);
-                clock_gettime(CLOCK_MONOTONIC, &fan_log_deadline);
-                timespec_add_sec(&fan_log_deadline, svc->cfg->fan_log_interval_sec);
-                pthread_mutex_lock(&svc->bus.lock);
+                clock_gettime(CLOCK_MONOTONIC, &now);
+                if (!timespec_lt(&now, &fan_log_deadline)) {
+                    pthread_mutex_unlock(&svc->bus.lock);
+                    log_fan_speeds(svc, prev_fans, &prev_fan_count);
+                    clock_gettime(CLOCK_MONOTONIC, &fan_log_deadline);
+                    timespec_add_sec(&fan_log_deadline, svc->cfg->fan_log_interval_sec);
+                    pthread_mutex_lock(&svc->bus.lock);
+                }
             }
         }
         if (svc->bus.updated) {
