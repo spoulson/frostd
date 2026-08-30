@@ -148,7 +148,12 @@ static void log_fan_speeds(service_t *svc,
 
 void service_run(service_t *svc) {
     pthread_mutex_init(&svc->bus.lock, NULL);
-    pthread_cond_init(&svc->bus.cond, NULL);
+
+    pthread_condattr_t cond_attr;
+    pthread_condattr_init(&cond_attr);
+    pthread_condattr_setclock(&cond_attr, CLOCK_MONOTONIC);
+    pthread_cond_init(&svc->bus.cond, &cond_attr);
+    pthread_condattr_destroy(&cond_attr);
     svc->bus.stop    = 0;
     svc->bus.updated = 0;
     for (int i = 0; i < svc->monitor_count; i++)

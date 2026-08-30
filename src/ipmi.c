@@ -136,7 +136,7 @@ static int read_sensors_by_type(real_ipmi_impl_t *r, unsigned int sensor_type,
             }
             count++;
         }
-    } while (ipmi_monitoring_sensor_iterator_next(r->mon_ctx) == 0);
+    } while (ipmi_monitoring_sensor_iterator_next(r->mon_ctx) == 1);
 
     return count;
 }
@@ -157,10 +157,21 @@ static int real_raw_command(void *impl, uint8_t netfn, uint8_t cmd,
                              const uint8_t *data, int data_len,
                              uint8_t *resp, int *resp_len) {
     real_ipmi_impl_t *r = impl; /* needs write access for errmsg */
+
+    /* ipmi_cmd_raw's request buffer must start with the command byte,
+     * followed by the command's data bytes. */
+    uint8_t rq_buf[256];
+    if (data_len < 0 || (size_t)data_len + 1 > sizeof(rq_buf)) {
+        snprintf(r->errmsg, sizeof(r->errmsg), "raw command data too long");
+        return -1;
+    }
+    rq_buf[0] = cmd;
+    if (data_len > 0) memcpy(&rq_buf[1], data, (size_t)data_len);
+    int rq_len = data_len + 1;
+
     uint8_t rs_buf[256];
     int rs_len = (int)sizeof(rs_buf);
-    int rc = ipmi_cmd_raw(r->raw_ctx, 0, netfn, data, data_len, rs_buf, rs_len);
-    (void)cmd;
+    int rc = ipmi_cmd_raw(r->raw_ctx, 0, netfn, rq_buf, rq_len, rs_buf, rs_len);
     if (rc < 0) {
         snprintf(r->errmsg, sizeof(r->errmsg),
                  "ipmi_cmd_raw: %s", ipmi_ctx_errormsg(r->raw_ctx));
