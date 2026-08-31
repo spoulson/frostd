@@ -1,3 +1,8 @@
 /frostd
 /bin
 frostd*.deb
+test_config
+test_cpu
+test_fan
+test_gpu
+test_metrics
