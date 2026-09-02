@@ -36,9 +36,19 @@ This allows for a measurable power reduction at idle.
 
 - Dell PowerEdge 12th generation server (e.g. R720)
 - Debian or Ubuntu Linux, x86-64
-- Go 1.26+ (build only)
-- `make` (build only)
 - Compatible NVIDIA driver and CUDA toolkit (GPU monitoring only)
+
+### Build requirements
+
+- GCC 9+ (GCC 13+ recommended for C23 support)
+- `make`
+- `libcyaml-dev` (YAML parsing)
+- `libyaml-dev` (libcyaml dependency)
+- `libipmimonitoring-dev` (IPMI sensor reads)
+- `libfreeipmi-dev` (IPMI raw commands)
+- `libmicrohttpd-dev` (Prometheus HTTP server)
+- `libcmocka-dev` (unit testing)
+- `cppcheck` (static analysis)
 
 ## Dev Tooling
 ### Build
