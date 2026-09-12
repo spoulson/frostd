@@ -90,60 +90,95 @@ affecting hardware.
 
 ## Technology Stack
 
-`frostd` is written in Golang and compiled to standalone executable file to be
-run on Debian or Ubuntu Linux on x86-64 architecture.  The executable runs as a
-systemd service.
+`frostd` is written in C (C23 standard) and compiled to a standalone executable
+to be run on Debian or Ubuntu Linux on x86-64 architecture.  The executable
+runs as a systemd service.
 
 ## Developer Prerequisites
 
 - Debian or Ubuntu Linux OS on x86-64 architecture
-- Golang 1.26+ installed
+- GCC 9+ installed (GCC 13+ recommended for C23 support)
 - `make` installed
+- C development libraries:
+  - `libcyaml-dev` (YAML parsing)
+  - `libyaml-dev` (libcyaml dependency)
+  - `libipmimonitoring-dev` (IPMI sensor reads)
+  - `libfreeipmi-dev` (IPMI raw commands)
+  - `libmicrohttpd-dev` (Prometheus HTTP server)
+  - `libcmocka-dev` (unit testing)
+  - `cppcheck` (static analysis)
 
 ## Software Design
 
 ### Technology Stack
 
-- `frostd` is a systemd service written in latest Golang.
+- `frostd` is a systemd service written in C (C23 standard).
 - It must be run on a Dell PowerEdge 12th generation server.
+
+### Source Layout
+
+```
+src/        C source and header files
+tests/      Unit test files and shared test helpers
+packaging/  Debian package scripts and systemd configuration
+```
 
 ### Tooling
 
-- Use `slog` package for logging.
-- Use module `github.com/bougou/go-ipmi` for IPMI support.  Do not depend on
-the commonly used `ipmitool` command.
+- Use structured logging via `src/log.c/.h` (text key=value or JSON format).
+- Use `libipmimonitoring` for IPMI sensor reads (temperature, fan).
+- Use `libfreeipmi` API (`ipmi_ctx_t`) for IPMI raw commands (fan control).
+- Do not depend on the commonly used `ipmitool` command.
+- Use `libcyaml` for YAML config parsing.
+- Use `libmicrohttpd` for the Prometheus metrics HTTP endpoint.
+
+### Interfaces (vtable pattern)
+
+C interfaces are implemented as function-pointer structs:
+- `ipmi_ops_t` (`src/ipmi.h`) — IPMI operations (connect/sensors/raw command)
+- `temp_reader_t` (`src/metrics.h`) — temperature reader for sensor monitors
+- `cmd_runner_t` (`src/gpu.h`) — command execution (nvidia-smi)
+
+Tests inject mock implementations of these vtables instead of real hardware.
 
 ### Service Lifecycle
 
 Service starts up by parsing and validating the configuration file.
 
-Then, the service runs in a loop.  On each iteration:
+Then, the service runs with one pthread per sensor type.  Each sensor thread:
 - Polls temperature metrics
-- Compute suggested fan speed
-- Set chassis fan speed
-- Sleep until next interval
-  - Sleep to incremental times, not static durations.  This ensures loops occur
-  on steady cadence even if one iteration takes a bit longer to process.
+- Computes suggested fan speed
+- Posts the speed to a shared `speed_bus_t` (mutex + condvar)
+- Sleeps until next tick using `clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME)`
+  for steady cadence
 
-The service immediately and gracefully stops when requested with command:
-`systemctl stop frostd`.
+The main thread waits on the `speed_bus_t` condvar (with a fan-log timeout),
+takes the max speed across all sensors, and calls `fan_set_speed()`.
+
+The service gracefully stops on SIGTERM/SIGINT via a `volatile sig_atomic_t
+g_shutdown` flag checked in each thread loop.
+
+**Note:** IPMI calls are synchronous and blocking. SIGTERM response time may
+be up to one IPMI timeout period (~5–10 seconds) while an IPMI call completes.
 
 ### Tests
 
 Tests are required to confirm requirements and prevent regressions during code
 maintenance.
 
-Use module `github.com/stretchr/testify` for `assert` and `require` packages
-for simplifying assertions and validation logic.
+Use `libcmocka` for test assertions (`assert_int_equal`, `assert_string_equal`,
+`assert_float_equal`, etc.).  Each test file has its own `main()` function and
+is compiled and run independently by `make test`.
 
-End-to-end tests are required for functionality:
-- Configuration parsing
-    - YAML file structure
-    - Validation for each field with happy path, numeric range errors, and likely special case checks
-- Computing aggregate temperature metrics
+Shared mock helpers live in `tests/test_helpers.h` and `tests/test_helpers.c`.
+
+Test coverage required for:
+- Configuration parsing (YAML, defaults, validation)
+- Computing aggregate temperature metrics (rolling buffer)
 - Computing suggested fan speeds from mock temperature samples
-- Reading actual CPU temperature metrics
-- Reading actual NVIDIA GPU temperature metrics using `nvidia-smi`
+- Reading CPU temperature metrics via mock IPMI vtable
+- Reading GPU temperature metrics via mock command runner
+- Fan IPMI control (ReadFanSpeeds, SetSpeed) via mock IPMI vtable
 
 ### Error Handling
 
@@ -165,18 +200,17 @@ next iteration when fan speed is suggested again.
 
 ## Launch From Source
 
-The repository will provide a `make run` target that will:
-- Call `go run` to launch the service using the configuration file `dev.yaml`.
-- `dev.yaml` is a copy of the default configuration file used for installing
-`/etc/frostd.yaml`.
-- Log output goes to stdout instead of a log file.
+The repository provides a `make run` target that:
+- Builds the service binary
+- Launches it using the configuration file `dev.yaml`
+- Log output goes to stdout (since `dev.yaml` has no `log_file` set)
 
 ## Software Package Installation
 
-The repository will provide a `make package` target that will:
-- Build the executable
-- Build a Debian .deb package that can be installed with `apt install` on
-Debian and Ubuntu Linux OS
+The repository provides a `make package` target that:
+- Builds the executable
+- Builds a Debian .deb package installable with `apt install` on
+  Debian and Ubuntu Linux OS
 
 The package includes the compiled executable, default configuration for
 `/etc/frostd.yaml`, and systemd service configuration.
@@ -196,10 +230,18 @@ not a literal filename.  Place the directive on the line before its definition,
 not as a single directive for all targets.  This helps prevent forgetting to
 update the list.
 
-### Golang
+### C
 
-Write code for latest Golang version. Follow Golang's current standards of code
-style and best practices as outlined in Effective Go by Google.
+Write code targeting C23 (`-std=c2x` flag for GCC 13).  Follow standard C best
+practices: const-correctness, error-checked return codes, no implicit fallthrough.
+
+- Compile flags: `-std=c2x -D_GNU_SOURCE -Wall -Wextra -Wpedantic`
+- No global mutable state except `volatile sig_atomic_t g_shutdown` in main.c
+- Memory ownership: functions that allocate with `malloc` expose a matching
+  `*_free()` function; the caller is responsible for calling it.
+- Error reporting: functions return -1 (or NULL) on failure and write a
+  human-readable message into a caller-supplied `char *errbuf, int errbuflen`
+  parameter pair.
 
 ## License
 
